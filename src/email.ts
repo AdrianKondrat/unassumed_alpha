@@ -131,8 +131,8 @@ export async function sendNotification(env: Env, ctx: SignupContext): Promise<Se
   return send(
     env,
     {
-      from: env.FROM_ADDRESS,
-      to: [env.NOTIFY_TO],
+      from: env.WAITLIST_FROM_EMAIL,
+      to: [env.WAITLIST_NOTIFICATION_TO],
       reply_to: [ctx.email],
       subject: `Waitlist: ${ctx.email}`,
       text,
@@ -184,9 +184,9 @@ export async function sendConfirmation(env: Env, email: string): Promise<SendRes
 </body></html>`;
 
   return send(env, {
-    from: env.FROM_ADDRESS,
+    from: env.WAITLIST_FROM_EMAIL,
     to: [email],
-    reply_to: [env.NOTIFY_TO],
+    reply_to: [env.WAITLIST_NOTIFICATION_TO],
     subject: `You’re on the ${env.BRAND_NAME} list`,
     text,
     html,

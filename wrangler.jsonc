@@ -7,9 +7,10 @@
  * pipeline without ever invoking the Worker — so the page itself costs no
  * Worker invocations and is not subject to Worker CPU limits.
  *
- * Secrets (RESEND_API_KEY, optional TURNSTILE_SECRET_KEY) are NOT in this file.
- * Local:      Website/.dev.vars   (git-ignored)
- * Production: npx wrangler secret put RESEND_API_KEY
+ * Secrets (RESEND_API_KEY, optional TURNSTILE_SECRET_KEY) are NOT in this file
+ * and must never be added to it — this file is committed to a public repo.
+ * Local:      .dev.vars   (git-ignored)
+ * Production: npx wrangler secret put RESEND_API_KEY, or the dashboard
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -38,6 +39,20 @@
     "not_found_handling": "none"
   },
 
+  // Waitlist storage. The signup row is written before Resend is called, so an
+  // email outage costs a notification, not a signup. Apply the schema with:
+  //   npx wrangler d1 migrations apply unassumed-alpha --remote
+  "d1_databases": [
+    {
+      "binding": "DB",
+      // Label only — `database_id` is what actually binds. Correct this if the
+      // database is called something else in your dashboard.
+      "database_name": "unassumed-alpha",
+      "database_id": "7ea31764-1dc7-4108-bec9-e7a13b495d3d",
+      "migrations_dir": "migrations"
+    }
+  ],
+
   // Per-IP throttle in front of the Resend call. `namespace_id` is any integer
   // that is unique within your Cloudflare account.
   "ratelimits": [
@@ -48,12 +63,17 @@
     }
   ],
 
-  // Non-secret configuration. Keep in sync with site.config.json.
+  // Non-secret configuration.
+  //
+  // These are the authority: `wrangler deploy` replaces the Worker's plain-text
+  // variables with exactly this set, so a variable added in the dashboard and
+  // not listed here is removed on the next deploy. Secrets are separate and are
+  // never touched by a deploy.
   "vars": {
     "SITE_ORIGIN": "https://unassumed.com",
     "BRAND_NAME": "Unassumed",
-    "NOTIFY_TO": "office@hailanderstudio.com",
-    "FROM_ADDRESS": "Unassumed <waitlist@unassumed.com>",
+    "WAITLIST_NOTIFICATION_TO": "office@hailanderstudio.com",
+    "WAITLIST_FROM_EMAIL": "UNASSUMED <office@hailanderstudio.com>",
     "SEND_CONFIRMATION": "true"
   }
 

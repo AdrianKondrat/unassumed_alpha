@@ -15,18 +15,23 @@ as it ships.
    slash), then run `npm run build`. That one value propagates to every canonical
    URL, Open Graph tag, `sitemap.xml` and `robots.txt` entry.
 2. **Verify a sending domain in Resend.** Resend → Domains → Add Domain, then add
-   the DKIM, SPF and DMARC records to Cloudflare DNS. Until this is done, every
-   send is rejected and the form returns a 502. Set `vars.FROM_ADDRESS` in
-   `wrangler.jsonc` to an address on that domain.
-3. **Add the API key as a secret** (never in a file that is committed):
+   the DKIM, SPF and DMARC records to Cloudflare DNS. `WAITLIST_FROM_EMAIL` must
+   be an address on that domain (currently `hailanderstudio.com`). Until the
+   domain is verified, every send is rejected.
+3. **Add the API key as a secret** — never in a committed file, and this repo is
+   public:
    ```bash
    npx wrangler secret put RESEND_API_KEY
    ```
    Create the key at resend.com/api-keys with **Sending access** only.
-4. **Fill in the privacy notice.** `public/privacy.html` has bracketed
+4. **Apply the database schema:**
+   ```bash
+   npx wrangler d1 migrations apply unassumed-alpha --remote
+   ```
+5. **Fill in the privacy notice.** `public/privacy.html` has bracketed
    placeholders for your registered company name, address and the transfer
    mechanism in your Resend and Cloudflare contracts.
-5. **Decide the bracketed values on the page.** The price, the beta date and the
+6. **Decide the bracketed values on the page.** The price, the beta date and the
    rehearsal count render as deliberate blanks (`[$6.99]`, `Nov 2026`, `[5]`).
    That is a design device, not an oversight — but confirm you want it live.
 
@@ -36,6 +41,7 @@ as it ships.
 
 ```bash
 npm install          # once
+npx wrangler d1 migrations apply unassumed-alpha --local   # once, for local dev
 npm run dev          # wrangler dev — the real Worker, locally
 npm run check        # build + typecheck + deploy dry-run. Run before every push.
 npm run deploy       # build + typecheck + wrangler deploy
@@ -44,7 +50,12 @@ npm run tail         # live production logs
 
 Local development needs `.dev.vars` (git-ignored). Copy `.dev.vars.example` and
 put a real Resend key in it if you want to send test mail; the file is never
-uploaded.
+uploaded and never committed.
+
+**Variables set in the dashboard are not authoritative.** `wrangler deploy`
+replaces the Worker's plain-text variables with exactly the `vars` block in
+`wrangler.jsonc`, so a variable added in the dashboard and not listed there is
+removed on the next deploy. Secrets are separate and a deploy never touches them.
 
 ---
 
@@ -58,8 +69,10 @@ src/
   waitlist.ts         The endpoint: origin check, rate limit, honeypot, validation.
   email.ts            Resend over fetch. Notification + confirmation templates.
   validate.ts         Email parsing and HTML escaping.
+  storage.ts          D1 writes. Degrades rather than throws.
   security.ts         Response headers, origin check, optional Turnstile.
   env.ts              Bindings.
+migrations/           D1 schema. Applied with `wrangler d1 migrations apply`.
 public/               The site. Edit these files directly.
   _headers            GENERATED — do not edit. Change scripts/build.mjs instead.
 ```
@@ -83,6 +96,7 @@ Abuse controls, in the order they run:
 | Per-IP rate limit, 5 per 60s | `ratelimits` binding, `wrangler.jsonc` |
 | Honeypot field (`company`) — silently accepted, nothing sent | `src/waitlist.ts` |
 | 4 KB body cap | `src/waitlist.ts` |
+| Duplicate suppression (unique index) | `migrations/0001_*.sql` |
 | Turnstile — **off by default**, enabled by setting the secret | `src/security.ts` |
 
 There is no CORS header anywhere, so nothing can read a response cross-origin.
@@ -94,9 +108,38 @@ To turn Turnstile on: add the widget to both forms, add
 
 ### Where signups are stored
 
-**Nowhere.** They exist only as email in the team inbox. If a Resend call fails,
-the visitor sees an error and the address is written to Workers Logs — recoverable
-by hand, but not a system. See `Prelaunch_Analysis/next_steps.md`.
+D1, table `waitlist_signups`. **The row is written before Resend is called**, so
+an email outage costs a notification, not a signup. The four outcomes:
+
+| Row written | Email sent | Visitor sees | Why |
+|---|---|---|---|
+| ✅ | ✅ | success | normal |
+| ✅ | ❌ | **success** | the address is safe; failing the visitor over our outage would lose a real signup for nothing |
+| — (duplicate) | not attempted | success | already on the list; re-sending on demand would make the form a way to mail-bomb someone |
+| ❌ | ❌ | 502 | it landed nowhere, so they must be told |
+
+After any Resend outage, this is the recovery query:
+
+```sql
+SELECT email, created_at FROM waitlist_signups WHERE notified_at IS NULL ORDER BY created_at;
+```
+
+Deduplication is on a fully lower-cased copy of the address (`email_normalised`,
+unique index), while `email` keeps the local part as typed — RFC 5321 makes local
+parts case-sensitive. `ON CONFLICT DO NOTHING` does the check in one statement,
+so two simultaneous submissions of the same address cannot both win.
+
+The `DB` binding is optional in code. If it is missing, the endpoint degrades to
+email-only rather than refusing signups.
+
+Useful queries:
+
+```bash
+npx wrangler d1 execute unassumed-alpha --remote --command \
+  "SELECT COUNT(*) FROM waitlist_signups"
+npx wrangler d1 execute unassumed-alpha --remote --command \
+  "SELECT source, COUNT(*) FROM waitlist_signups GROUP BY source"   # which form converts
+```
 
 ### Security headers
 

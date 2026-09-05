@@ -15,6 +15,13 @@ export interface Env {
   /** Static assets in `public/`. Used to serve our own 404 page. */
   ASSETS: Fetcher;
 
+  /**
+   * Waitlist storage. Optional so the endpoint still works on a deployment
+   * where the binding has not been created — it degrades to email-only rather
+   * than refusing signups.
+   */
+  DB?: D1Database;
+
   /** Secret. `wrangler secret put RESEND_API_KEY`. */
   RESEND_API_KEY: string;
 
@@ -26,8 +33,10 @@ export interface Env {
 
   SITE_ORIGIN: string;
   BRAND_NAME: string;
-  NOTIFY_TO: string;
-  FROM_ADDRESS: string;
+  /** Where signup notifications go. */
+  WAITLIST_NOTIFICATION_TO: string;
+  /** Envelope sender. Must be on a domain verified in Resend. */
+  WAITLIST_FROM_EMAIL: string;
   /** "true" to also send the signer-up a confirmation. */
   SEND_CONFIRMATION: string;
 }

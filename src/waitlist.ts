@@ -9,6 +9,7 @@
 import type { Env } from "./env";
 import { parseEmail } from "./validate";
 import { sendConfirmation, sendNotification } from "./email";
+import { markSent, storeSignup } from "./storage";
 import {
   htmlResponse,
   isTrustedOrigin,
@@ -131,44 +132,73 @@ export async function handleWaitlist(
     return fail("We couldn’t verify that you’re human. Reload the page and try again.", 403);
   }
 
-  const notification = await sendNotification(env, {
+  const record = {
     email: parsed.email,
     source: submission.source,
     country: (request as { cf?: { country?: string } }).cf?.country ?? "unknown",
     userAgent: (request.headers.get("User-Agent") ?? "unknown").slice(0, 200),
     receivedAt: new Date().toISOString(),
-  });
+  };
 
-  if (!notification.ok) {
-    // The address is in the log line, so a failed send is still recoverable by
-    // hand. Visible only to the account owner in Workers Logs.
+  const succeed = (): Response =>
+    wantsJson
+      ? jsonResponse({ ok: true }, 200)
+      : redirectResponse(`${new URL(request.url).origin}/thanks`);
+
+  // Write the row first. From here on, an email provider outage costs a
+  // notification — recoverable with `SELECT ... WHERE notified_at IS NULL` —
+  // rather than the signup itself, which is recoverable from nowhere.
+  const stored = await storeSignup(env.DB, record);
+
+  // Already on the list. Say yes and send nothing: re-notifying the team is
+  // noise, and re-sending the confirmation on demand would turn the form into
+  // a way to mail-bomb somebody else's inbox.
+  if (stored.status === "duplicate") {
+    return succeed();
+  }
+
+  const notification = await sendNotification(env, record);
+
+  if (notification.ok) {
+    if (stored.status === "created") {
+      ctx.waitUntil(markSent(env.DB, stored.id, "notified_at"));
+    }
+  } else {
     console.error("resend_notification_failed", {
       status: notification.status,
       error: notification.error,
       email: parsed.email,
+      persisted: stored.status === "created",
     });
-    return fail(
-      "Something broke on our side, not yours. Try again in a moment, or email office@hailanderstudio.com.",
-      502,
-    );
+
+    // Only an error if the signup is nowhere at all. If the row was written,
+    // the address is safe and telling the visitor otherwise would lose a
+    // conversion over a problem that is entirely ours.
+    if (stored.status !== "created") {
+      return fail(
+        `Something broke on our side, not yours. Try again in a moment, or email ${env.WAITLIST_NOTIFICATION_TO}.`,
+        502,
+      );
+    }
   }
 
-  // Best effort. The signup is already recorded in the team inbox, so a failed
-  // confirmation must never turn a successful signup into an error.
+  // Best effort. The signup is already safe, so a failed confirmation must
+  // never turn a successful signup into an error.
   if (env.SEND_CONFIRMATION === "true") {
     ctx.waitUntil(
       sendConfirmation(env, parsed.email).then((result) => {
-        if (!result.ok) {
-          console.error("resend_confirmation_failed", {
-            status: result.status,
-            error: result.error,
-          });
+        if (result.ok) {
+          if (stored.status === "created") return markSent(env.DB, stored.id, "confirmed_at");
+          return undefined;
         }
+        console.error("resend_confirmation_failed", {
+          status: result.status,
+          error: result.error,
+        });
+        return undefined;
       }),
     );
   }
 
-  return wantsJson
-    ? jsonResponse({ ok: true }, 200)
-    : redirectResponse(`${new URL(request.url).origin}/thanks`);
+  return succeed();
 }
