@@ -1,0 +1,22 @@
+# Unassumed — https://unassumed.com
+
+User-agent: *
+Allow: /
+Disallow: /api/
+Disallow: /thanks
+
+# AI crawlers are allowed deliberately: this is a pre-launch page whose whole
+# job is to be found and described accurately. See /llms.txt.
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://unassumed.com/sitemap.xml

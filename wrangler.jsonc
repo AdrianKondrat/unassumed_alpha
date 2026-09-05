@@ -1,0 +1,62 @@
+/**
+ * Cloudflare Workers configuration.
+ *
+ * The site is static assets served straight from Cloudflare's edge, plus one
+ * Worker route (`POST /api/waitlist`). Because `run_worker_first` is not set,
+ * every request that matches a file in `public/` is served by the assets
+ * pipeline without ever invoking the Worker — so the page itself costs no
+ * Worker invocations and is not subject to Worker CPU limits.
+ *
+ * Secrets (RESEND_API_KEY, optional TURNSTILE_SECRET_KEY) are NOT in this file.
+ * Local:      Website/.dev.vars   (git-ignored)
+ * Production: npx wrangler secret put RESEND_API_KEY
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "unassumed-website",
+  "main": "src/index.ts",
+
+  // Pin the runtime's behaviour. Raising this date opts into newer runtime
+  // semantics; do it deliberately and re-test, never as a routine bump.
+  "compatibility_date": "2026-09-05",
+
+  // Workers Logs. Required to see `console.error` from a failed Resend call.
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+
+    // "/privacy" serves privacy.html; "/privacy/" redirects to "/privacy".
+    "html_handling": "auto-trailing-slash",
+
+    // "none" = a request with no matching asset falls through to the Worker,
+    // which is what routes /api/waitlist and renders our own 404.
+    "not_found_handling": "none"
+  },
+
+  // Per-IP throttle in front of the Resend call. `namespace_id` is any integer
+  // that is unique within your Cloudflare account.
+  "ratelimits": [
+    {
+      "name": "WAITLIST_LIMITER",
+      "namespace_id": "1001",
+      "simple": { "limit": 5, "period": 60 }
+    }
+  ],
+
+  // Non-secret configuration. Keep in sync with site.config.json.
+  "vars": {
+    "SITE_ORIGIN": "https://unassumed.com",
+    "BRAND_NAME": "Unassumed",
+    "NOTIFY_TO": "office@hailanderstudio.com",
+    "FROM_ADDRESS": "Unassumed <waitlist@unassumed.com>",
+    "SEND_CONFIRMATION": "true"
+  }
+
+  // Add your zone here once DNS is on Cloudflare, then `npm run deploy`:
+  // "routes": [{ "pattern": "unassumed.com", "custom_domain": true }]
+}

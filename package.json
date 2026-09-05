@@ -1,0 +1,21 @@
+{
+  "name": "unassumed-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Unassumed marketing site — static assets on Cloudflare Workers with a Resend-backed waitlist endpoint.",
+  "type": "module",
+  "engines": { "node": ">=20.0.0" },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "npm run build && wrangler dev",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run build && npm run typecheck && wrangler deploy --dry-run",
+    "deploy": "npm run build && npm run typecheck && wrangler deploy",
+    "tail": "wrangler tail",
+    "cf-typegen": "wrangler types"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "wrangler": "^4.129.0"
+  }
+}
