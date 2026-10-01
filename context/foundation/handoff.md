@@ -1,4 +1,4 @@
-# Handoff: state of the MVP build (updated 2026-10-01, session 3, S-05, S-06 and S-07 done)
+# Handoff: state of the MVP build (updated 2026-10-01, session 3, all roadmap slices done)
 
 Read this first when resuming. It captures what is built, exactly where to resume, how the user wants to work, and the traps found so far. Authoritative sources remain `roadmap.md`, `prd.md` and each `context/changes/<id>/plan.md`.
 
@@ -21,13 +21,20 @@ Branch `mvp` (push here only; **never open a PR unless the user asks**). Default
 
 CI status (checked in session 3): S-02, S-04, S-05 (06b4de6 + the CLI-pin commit f46b265): `ci` and `smoke` green **on the real Supabase CLI** (including S-05's real-PostgREST privacy step); `deploy` fails only at "Check required secrets", by design. The `smoke` job once failed with `supabase/setup-cli: rate limit exceeded` (GitHub API, unrelated to code); the CLI version is now pinned (2.117.0). Check the CI run of the latest commit first. Tip: `mcp__github__actions_list` `list_workflow_runs` ignores `per_page` and returns a huge payload; prefer `list_workflow_jobs` with a known run id (run URL in the push result / the previous listing) and `get_job_logs` with `return_content: true`.
 
-## RESUME HERE: S-03 (manual canvas editing), then polish
+## RESUME HERE: polish, then the user-only live checks
 
-S-05, S-06 and S-07 are finished (see "What S-07 shipped" and "What S-06 shipped"). Next, in order:
+Every roadmap slice (F-01..F-03, S-01..S-07) is implemented on `mvp`. What is left is polish and things only the user can do:
 
-1. **S-03** manual canvas editing with conflict-safe saves (plan `context/changes/manual-canvas-editing-with-conflict-safety/plan.md`; read "Plan reconciliations" below first: the plan's column names do not match the real `canvas_claims`).
-2. Polish: README rewrite for Unassumed (it still has starter-era text), a Content-Security-Policy (React islands need care), rate limiting on the AI routes, then the user-only actions list.
-3. The live checks only the user can do (see "Actions only the user can do").
+1. **README rewrite** for Unassumed (it still has starter-era text), a **Content-Security-Policy** (React islands need care), **rate limiting** on the AI routes if abuse appears, observability (parked in the roadmap).
+2. The secondary PRD success criterion (trend across rehearsals) is not in any slice; consider a small follow-up.
+3. The **user-only actions** below (GitHub secrets, hosted Supabase, Workers Paid plan, one hands-on pass with the real OpenRouter key). Nothing in this repo has ever been run against the real model: prompts for canvas draft, assumption suggestion, persona and scoring, the `openai/gpt-4o-mini` slug and latency are all unverified.
+
+### What S-03 shipped
+
+- DB (`20261001100700_canvas_claims_editing.sql`, test `supabase/tests/canvas_claims_editing.sql`): UPDATE/DELETE policies, the `canvas_claims_guard` trigger (revision bump, origin on text change, immutable placement), `add_canvas_claim` (advisory lock, next position, cap 12). There is no `updated_at`.
+- Code: `canvas-edit.ts` (pure, `npm run test:canvas-edit`), `claims.ts`, `claims-route.ts`, routes `POST /api/claims` and `PATCH|DELETE /api/claims/[id]`, island `CanvasEditor` + `useClaimEditor` on `/project`; `CanvasBoard.astro` and `ClaimCard.astro` were removed. `/project?blank=1` starts an empty canvas.
+- Tests: 120 smoke steps; 19 SQL mutations (16 caught, 3 equivalent), 10 offline, 9 app-level; a Chromium script for the two-tab conflict, keyboard-only use, deleted-elsewhere and the blank canvas.
+- Not verified: `npx supabase db lint` (needs Docker).
 
 ### What S-07 shipped (for S-03 and later)
 
@@ -67,7 +74,7 @@ S-05, S-06 and S-07 are finished (see "What S-07 shipped" and "What S-06 shipped
   1. `scripts/sandbox-stack/stack.sh start` (if the stack is down), then `stack.sh reset`.
   2. `node scripts/fake-openrouter.mjs &` (kill by port: `for pid in $(lsof -t -iTCP:4010 -sTCP:LISTEN); do kill $pid; done`).
   3. `npm run build`, then `npm run preview -- --port 4321 &` (kill by port 4321; logs via `npx astro preview logs`).
-  4. `eval "$(scripts/sandbox-stack/stack.sh keys)"; FAKE_AI_URL=http://127.0.0.1:4010 SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY npm run smoke` (auth + product flow incl. the real-PostgREST privacy check; 112 steps; add `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres` to run the S-07 lease/expiry steps; exit code 0 = all pass; reset the fake with `curl -X POST :4010/__reset` and the DB with `stack.sh reset` between runs).
+  4. `eval "$(scripts/sandbox-stack/stack.sh keys)"; FAKE_AI_URL=http://127.0.0.1:4010 SUPABASE_URL=$API_URL SUPABASE_ANON_KEY=$ANON_KEY npm run smoke` (auth + product flow incl. the real-PostgREST privacy check; 120 steps; add `DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres` to run the S-07 lease/expiry steps; exit code 0 = all pass; reset the fake with `curl -X POST :4010/__reset` and the DB with `stack.sh reset` between runs).
   5. SQL tests, `npm run test:ai|auth|canvas|assumptions|rehearsal`, `npm run lint`, `npx astro check`.
 - Screenshots: install `playwright-core` in the scratchpad dir (not the repo), launch `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` with `--no-sandbox` (set up the founder over HTTP like the smoke test and inject the cookies into the browser context; Playwright's `text=Try again` matches the first element containing the text, so target buttons with `button:has-text(...)`). Gotchas: scope clicks as `main form button[type=submit]` (the header's Sign out is also a submit button); to get a signed-in user, sign up through the form, then `psql … -c "update auth.users set email_confirmed_at=now() where email='…'"`, then sign in. The previous shot script was in the scratchpad and is gone; rewrite it.
 - Shell gotchas: **never write `echo "... $(cmd) $?"`**: the command substitution resets `$?` to 0 and hides a failing psql (a SQL loop reported success this way in session 3; use `/tmp`-style helper that captures `rc=$?` first); the working directory resets between commands (use absolute paths / `cd /home/user/unassumed_alpha`); never `pkill -f <name>` when `<name>` appears in your own command line; `ss` is not installed (use `lsof`). **Do not pipe a command into `tail`/`head` and then trust `$?` or a following `echo OK`**: capture to a file and read the real exit code (a lint failure was hidden this way once).
@@ -76,7 +83,7 @@ S-05, S-06 and S-07 are finished (see "What S-07 shipped" and "What S-06 shipped
 
 ## Conventions established (follow them)
 
-- **Pure module + offline test pattern:** logic that does not need Astro lives in `src/lib/**/*.ts` with relative imports using `.ts` extensions and no `astro:*`/`@/` imports; tested by `scripts/test-<x>.mjs` (step-list style, exit non-zero on failure) via `node --disable-warning=ExperimentalWarning --experimental-strip-types`; add an npm script `test:<x>` and a CI step in the `ci` job. No enum/parameter-property TS syntax (strip-types). Add needed globals to `scriptsConfig` in `eslint.config.js`. Existing: `ai-request.ts`, `auth.ts`, `ai-output.ts`, `services/canvas-draft.ts`, `services/assumption-suggest.ts`, `services/rehearsal-persona.ts`, `services/scorecard.ts` + `scorecard-run.ts`, `services/rehearsal-resume.ts`.
+- **Pure module + offline test pattern:** logic that does not need Astro lives in `src/lib/**/*.ts` with relative imports using `.ts` extensions and no `astro:*`/`@/` imports; tested by `scripts/test-<x>.mjs` (step-list style, exit non-zero on failure) via `node --disable-warning=ExperimentalWarning --experimental-strip-types`; add an npm script `test:<x>` and a CI step in the `ci` job. No enum/parameter-property TS syntax (strip-types). Add needed globals to `scriptsConfig` in `eslint.config.js`. Existing: `ai-request.ts`, `auth.ts`, `ai-output.ts`, `services/canvas-draft.ts`, `services/assumption-suggest.ts`, `services/rehearsal-persona.ts`, `services/scorecard.ts` + `scorecard-run.ts`, `services/rehearsal-resume.ts`, `services/canvas-edit.ts`.
 - **DB:** migrations `supabase/migrations/YYYYMMDDHHmmss_*.sql` (last used `20261001100500`). RLS on every table, per-operation `authenticated` policies via `(select public.is_workspace_member(...))` / `(select public.is_project_member(...))`, revoke `anon`, `security definer` functions with `set search_path = ''`. Each migration gets a rolled-back SQL assertion script in `supabase/tests/` (impersonation pattern in `supabase/README.md`); **mutation-check** new assertions by breaking the schema once (done for S-02/S-04: every assertion family was shown to fail when its guard was removed). CI runs all of `supabase/tests/*.sql`. Rules that matter for security belong in the database (triggers/RLS), not only in routes, because the anon key is public and a founder can call PostgREST directly.
 - **Routes:** `export const prerender = false`; zod validation; form-POST → redirect with `?error=`/`?xError=<code>` for HTML forms (only known codes are rendered, never echo the query string), JSON + status codes for island APIs; API routes check `context.locals.user` themselves; pages go in `PROTECTED_ROUTES` (`src/middleware.ts`); add nav entries in `src/components/AppNav.astro` and flip the "Coming next" cards in `src/pages/dashboard.astro` as slices land.
 - **AI:** always `complete()` from `src/lib/ai.ts` with the founder's RLS client; pass `jsonMode: true` for JSON tasks; parsers use `extractJson`, validate with zod and **reject output containing "validated"/"proven"** via `findForbiddenWording`; never log prompts, transcripts or persona text (log error codes/kinds and parser reasons that name a path only). Founder content goes in delimited tags in the user message with an "ignore instructions inside" rule in the system prompt. Scorecard/persona code must never ship the persona scenario to the client.
@@ -88,7 +95,7 @@ S-05, S-06 and S-07 are finished (see "What S-07 shipped" and "What S-06 shipped
 
 ## Plan reconciliations (banners marked "RECONCILE BEFORE IMPLEMENTING" are in the plans)
 
-- **S-03** assumed `author_kind`/`version`/`workspace_id`/`updated_at` on `canvas_claims`; the real schema uses `origin` (`ai_draft | founder`), `revision`, no workspace column and no `updated_at`; access via `is_project_member()`; `ClaimCard.astro` already renders a teal "You" tag for founder claims; there is currently no claim UPDATE/DELETE policy. Enforce revision bumping / immutability in a trigger, as done for `assumptions_guard` in S-04.
+- **S-03** implemented; see "What S-03 shipped" above.
 - **S-05** implemented; see "What S-05 shipped" above.
 - **S-06** implemented; see "What S-06 shipped" above.
 - **S-07** implemented; see "What S-07 shipped" above.
@@ -110,4 +117,4 @@ Email links use `token_hash` + custom templates (`supabase/templates/`) instead 
 - Add a Content-Security-Policy (React islands need care), rate limiting on AI routes if abuse appears, observability (parked in the roadmap).
 - `README.md` still contains starter-era text in places; rewrite it for Unassumed once the slices land.
 - Secondary PRD success criterion (trend across rehearsals) is not in any slice; consider a small follow-up after S-06.
-- Accepted/edited canvas claims have no "accepted" concept (S-04 treats all claims as source material); revisit with S-03.
+- Canvas claims have no "accepted" concept (S-04 treats all claims as source material, edited or not); revisit if the AI-draft/founder distinction should affect suggestions.

@@ -1,7 +1,9 @@
 ---
 import Layout from "@/layouts/Layout.astro";
-import CanvasBoard from "@/components/canvas/CanvasBoard.astro";
+import { CanvasEditor } from "@/components/canvas/CanvasEditor";
 import { createClient } from "@/lib/supabase";
+import { CANVAS_BLOCKS, CLAIM_MAX_LENGTH } from "@/lib/services/canvas-draft";
+import { BLOCK_CLAIM_CAP, toPublicClaim } from "@/lib/services/canvas-edit";
 import { getCurrentProject, listClaims } from "@/lib/services/project";
 
 const supabase = createClient(Astro.request.headers, Astro.cookies);
@@ -9,7 +11,12 @@ const project = supabase ? await getCurrentProject(supabase) : null;
 if (!supabase || !project) return Astro.redirect("/project/new");
 
 const claims = await listClaims(supabase, project.id);
-const drafted = claims.length > 0;
+// The editor shows once there are claims, or when the founder chose to fill the canvas in themselves.
+const blank = Astro.url.searchParams.get("blank") === "1";
+const showEditor = claims.length > 0 || blank;
+const hasAiClaims = claims.some((claim) => claim.origin === "ai_draft");
+// Only the allow-listed fields become island props.
+const initialClaims = claims.map(toPublicClaim);
 
 // Only known codes are rendered; the query string is never echoed back.
 const DRAFT_ERRORS: Record<string, string> = {
@@ -32,15 +39,28 @@ const draftError = DRAFT_ERRORS[Astro.url.searchParams.get("draftError") ?? ""];
       <p class="mt-3 whitespace-pre-wrap text-ink-soft">{project.brief}</p>
     </details>
 
-    {drafted ? (
+    {showEditor ? (
       <>
-        <p class="notice notice-info mt-6 max-w-3xl">
-          <strong>Treat this as a first draft to argue with.</strong> Claims marked{" "}
-          <span class="tag tag-yellow">AI draft</span> were written by the AI from your notes. They are guesses, not
-          facts.
-        </p>
+        {hasAiClaims ? (
+          <p class="notice notice-info mt-6 max-w-3xl">
+            <strong>Treat this as a first draft to argue with.</strong> Claims marked{" "}
+            <span class="tag tag-yellow">AI draft</span> were written by the AI from your notes. They are guesses, not
+            facts. Edit, add or delete anything: your wording replaces the AI's and is marked <strong>You</strong>.
+          </p>
+        ) : (
+          <p class="notice notice-info mt-6 max-w-3xl">
+            <strong>Fill in the blocks in your own words.</strong> Short claims work best: one idea each, written as a
+            guess you could be wrong about.
+          </p>
+        )}
         <div class="mt-8">
-          <CanvasBoard claims={claims} />
+          <CanvasEditor
+            client:load
+            blocks={CANVAS_BLOCKS}
+            initialClaims={initialClaims}
+            claimMaxLength={CLAIM_MAX_LENGTH}
+            blockCap={BLOCK_CLAIM_CAP}
+          />
         </div>
         <div class="mt-10 flex flex-wrap items-center gap-4">
           <a href="/assumptions" class="btn btn-yellow">
@@ -73,6 +93,13 @@ const draftError = DRAFT_ERRORS[Astro.url.searchParams.get("draftError") ?? ""];
             </p>
           </div>
         </form>
+        <p class="mt-6 text-[15px] text-ink-soft">
+          Prefer to write it yourself?{" "}
+          <a href="/project?blank=1" class="link">
+            Start with a blank canvas
+          </a>
+          . You can still add or change anything later.
+        </p>
       </section>
     )}
   </div>

@@ -219,6 +219,51 @@ let zeroSession = "";
 let sessionThree = "";
 let sessionFour = "";
 let sessionFive = "";
+let editedClaim = null;
+/** JSON claim routes with any method, collected into `corpus`. */
+async function claimApi(method, path, { json, body, contentType = "application/json" } = {}) {
+  const response = await fetch(BASE_URL + path, {
+    method,
+    redirect: "manual",
+    headers: { Cookie: cookieHeader(), Origin: BASE_URL, "Content-Type": contentType },
+    body: body ?? JSON.stringify(json ?? {}),
+  });
+  storeCookies(response);
+  const text = note(await response.text());
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // not JSON: leave data null
+  }
+  return { status: response.status, data, text };
+}
+/** Astro serialises island props as [type, value] pairs (0 value, 1 array); this unwraps them. */
+function unwrapProps(value) {
+  if (Array.isArray(value) && value.length === 2 && typeof value[0] === "number") {
+    const [type, inner] = value;
+    if (type === 1) return inner.map(unwrapProps);
+    if (type === 0 && inner && typeof inner === "object" && !Array.isArray(inner)) {
+      return Object.fromEntries(Object.entries(inner).map(([k, v]) => [k, unwrapProps(v)]));
+    }
+    return inner;
+  }
+  return value;
+}
+/** The claims the canvas page hands to its editor island (id, block, position, text, origin, revision). */
+async function claimsOnPage() {
+  const page = await request("/project");
+  const tag = /<astro-island\b[^>]*component-export="CanvasEditor"[^>]*>/.exec(page.text)?.[0];
+  const raw = tag && /\sprops="([^"]*)"/.exec(tag)?.[1];
+  if (!raw) throw new Error("the canvas editor island was not on the page");
+  const decoded = raw
+    .replaceAll("&quot;", '"')
+    .replaceAll("&#39;", "'")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+  return unwrapProps(JSON.parse(decoded).initialClaims);
+}
 /** Page text with entities decoded and runs of whitespace collapsed, so assertions ignore markup wrapping and escaping. */
 const flat = (text) =>
   text
@@ -276,6 +321,21 @@ const steps = [
     async () => {
       const r = await getJson(stateApi(NIL_ID));
       check(r.status === 401, `state: expected 401, saw ${r.status}`);
+      return { status: 200, location: "" };
+    },
+    { status: 200 },
+  ],
+  [
+    "claim routes answer 401 to anonymous callers",
+    async () => {
+      for (const [method, path] of [
+        ["POST", "/api/claims"],
+        ["PATCH", `/api/claims/${NIL_ID}`],
+        ["DELETE", `/api/claims/${NIL_ID}`],
+      ]) {
+        const r = await claimApi(method, path, { json: { block: "channels", text: "x", expectedRevision: 1 } });
+        check(r.status === 401, `${method}: expected 401, saw ${r.status}`);
+      }
       return { status: 200, location: "" };
     },
     { status: 200 },
@@ -1726,6 +1786,305 @@ const steps = [
           { status: 200 },
         ],
         [
+          "claim routes refuse unusable input without touching any claim",
+          async () => {
+            const claims = await claimsOnPage();
+            check(claims.length >= 18, `expected the drafted canvas, saw ${claims.length} claims`);
+            const [target] = claims;
+            const patch = (id, json, extra = {}) => claimApi("PATCH", `/api/claims/${id}`, { json, ...extra });
+            const text = await claimApi("PATCH", `/api/claims/${target.id}`, {
+              body: "text=x",
+              contentType: "text/plain",
+            });
+            check(text.status === 415, `non-JSON: ${text.status}`);
+            const broken = await claimApi("PATCH", `/api/claims/${target.id}`, { body: "{not json" });
+            check(broken.status === 400, `broken JSON: ${broken.status}`);
+            const empty = await patch(target.id, { text: "   ", expectedRevision: 1 });
+            check(empty.status === 400, `empty text: ${empty.status}`);
+            const long = await patch(target.id, { text: "x".repeat(281), expectedRevision: 1 });
+            check(long.status === 400, `281 chars: ${long.status}`);
+            for (const expectedRevision of [0, -1, 1.5, "1", null]) {
+              const r = await patch(target.id, { text: "ok", expectedRevision });
+              check(r.status === 400, `revision ${JSON.stringify(expectedRevision)}: ${r.status}`);
+            }
+            const missing = await patch(target.id, { text: "ok" });
+            check(missing.status === 400, `no revision: ${missing.status}`);
+            const badId = await patch("not-a-uuid", { text: "ok", expectedRevision: 1 });
+            check(badId.status === 404, `malformed id: ${badId.status}`);
+            const ghost = await patch(NIL_ID, { text: "ok", expectedRevision: 1 });
+            check(ghost.status === 404 && ghost.data.error === "not_found", `unknown claim: ${ghost.status}`);
+            const create = (json) => claimApi("POST", "/api/claims", { json });
+            check((await create({ block: "nope", text: "ok" })).status === 400, "unknown block accepted");
+            check((await create({ block: "channels", text: "" })).status === 400, "empty new claim accepted");
+            check((await create({ block: "channels" })).status === 400, "new claim without text accepted");
+            check(
+              (await claimApi("DELETE", `/api/claims/${target.id}`, { json: {} })).status === 400,
+              "delete without revision accepted",
+            );
+            const after = await claimsOnPage();
+            check(
+              after.length === claims.length && after.find((c) => c.id === target.id).text === target.text,
+              "a refused request changed a claim",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "editing an AI claim saves the founder's wording, bumps the revision and marks it theirs; consecutive saves never conflict",
+          async () => {
+            const claims = await claimsOnPage();
+            const ai = claims.find((c) => c.origin === "ai_draft" && c.revision === 1);
+            check(ai, "no untouched AI claim to edit");
+            const first = await claimApi("PATCH", `/api/claims/${ai.id}`, {
+              json: {
+                text: "  Left-handed gardeners\n  struggle with shared tools  ",
+                expectedRevision: 1,
+                origin: "ai_draft",
+                revision: 99,
+                block: "channels",
+              },
+            });
+            check(first.status === 200, `first save: ${first.status} ${first.text.slice(0, 120)}`);
+            check(
+              first.data.claim.text === "Left-handed gardeners struggle with shared tools",
+              `text: ${first.data.claim.text}`,
+            );
+            check(
+              first.data.claim.revision === 2 && first.data.claim.origin === "founder",
+              `claim: ${JSON.stringify(first.data.claim)}`,
+            );
+            check(
+              first.data.claim.block === ai.block && first.data.claim.position === ai.position,
+              "a request moved the claim",
+            );
+            check(
+              Object.keys(first.data.claim).sort().join() === "block,id,origin,position,revision,text",
+              "claim fields are not the allow-list",
+            );
+            const second = await claimApi("PATCH", `/api/claims/${ai.id}`, {
+              json: { text: "Second wording", expectedRevision: 2 },
+            });
+            check(
+              second.status === 200 && second.data.claim.revision === 3,
+              `consecutive save: ${second.status} ${second.text.slice(0, 100)}`,
+            );
+            const same = await claimApi("PATCH", `/api/claims/${ai.id}`, {
+              json: { text: "Second wording", expectedRevision: 3 },
+            });
+            check(
+              same.status === 200 && same.data.claim.revision === 3,
+              `an unchanged save moved the revision: ${same.text.slice(0, 100)}`,
+            );
+            const page = await pageOf("/project");
+            check(
+              page.text.includes("Second wording") && !page.text.includes("Left-handed gardeners struggle"),
+              "the page does not show the saved wording",
+            );
+            const onPage = (await claimsOnPage()).find((c) => c.id === ai.id);
+            check(onPage.origin === "founder" && onPage.revision === 3, `page props: ${JSON.stringify(onPage)}`);
+            check(
+              Object.keys(onPage).sort().join() === "block,id,origin,position,revision,text",
+              `the island props carry other fields: ${Object.keys(onPage).join()}`,
+            );
+            editedClaim = { id: ai.id, block: ai.block, text: "Second wording", revision: 3 };
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a stale save is a conflict that carries the saved version and changes nothing; an identical stale save is not a conflict",
+          async () => {
+            const stale = await claimApi("PATCH", `/api/claims/${editedClaim.id}`, {
+              json: { text: "Loser wording", expectedRevision: 1 },
+            });
+            check(stale.status === 409 && stale.data.error === "conflict", `stale: ${stale.status}`);
+            check(
+              stale.data.current.text === editedClaim.text && stale.data.current.revision === editedClaim.revision,
+              `current: ${JSON.stringify(stale.data.current)}`,
+            );
+            check(
+              Object.keys(stale.data.current).sort().join() === "block,id,origin,position,revision,text",
+              "the conflict body leaked fields",
+            );
+            const unchanged = (await claimsOnPage()).find((c) => c.id === editedClaim.id);
+            check(
+              unchanged.text === editedClaim.text && unchanged.revision === editedClaim.revision,
+              "a refused save changed the claim",
+            );
+            const identical = await claimApi("PATCH", `/api/claims/${editedClaim.id}`, {
+              json: { text: editedClaim.text, expectedRevision: 1 },
+            });
+            check(
+              identical.status === 200 && identical.data.claim.revision === editedClaim.revision,
+              `identical stale save: ${identical.status}`,
+            );
+            // Keep mine: re-save against the revision that won.
+            const keep = await claimApi("PATCH", `/api/claims/${editedClaim.id}`, {
+              json: { text: "Loser wording", expectedRevision: stale.data.current.revision },
+            });
+            check(
+              keep.status === 200 && keep.data.claim.revision === editedClaim.revision + 1,
+              `keep mine: ${keep.status}`,
+            );
+            editedClaim = { ...editedClaim, text: "Loser wording", revision: keep.data.claim.revision };
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "two saves racing from the same revision give exactly one winner and one conflict",
+          async () => {
+            const { id } = editedClaim;
+            for (let round = 1; round <= 3; round++) {
+              const current = (await claimsOnPage()).find((c) => c.id === id);
+              const [a, b] = await Promise.all([
+                claimApi("PATCH", `/api/claims/${id}`, {
+                  json: { text: `Race ${round} from tab A`, expectedRevision: current.revision },
+                }),
+                claimApi("PATCH", `/api/claims/${id}`, {
+                  json: { text: `Race ${round} from tab B`, expectedRevision: current.revision },
+                }),
+              ]);
+              const statuses = [a.status, b.status].sort().join();
+              check(statuses === "200,409", `round ${round}: statuses ${statuses}`);
+              const [winner, loser] = a.status === 200 ? [a, b] : [b, a];
+              check(
+                loser.data.current.text === winner.data.claim.text,
+                `round ${round}: the conflict did not carry the winner's text`,
+              );
+              const saved = (await claimsOnPage()).find((c) => c.id === id);
+              check(
+                saved.text === winner.data.claim.text && saved.revision === current.revision + 1,
+                `round ${round}: saved ${JSON.stringify(saved)}`,
+              );
+            }
+            editedClaim = { ...editedClaim, ...(await claimsOnPage()).find((c) => c.id === id) };
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "deleting is revision-checked: a stale delete is a conflict, a current one deletes, a repeat is fine, editing a deleted claim is 404",
+          async () => {
+            const { id } = editedClaim;
+            const current = (await claimsOnPage()).find((c) => c.id === id);
+            const stale = await claimApi("DELETE", `/api/claims/${id}`, {
+              json: { expectedRevision: current.revision - 1 },
+            });
+            check(stale.status === 409 && stale.data.current.text === current.text, `stale delete: ${stale.status}`);
+            check(
+              (await claimsOnPage()).some((c) => c.id === id),
+              "a stale delete removed the claim",
+            );
+            const done = await claimApi("DELETE", `/api/claims/${id}`, {
+              json: { expectedRevision: current.revision },
+            });
+            check(done.status === 200 && done.data.deleted === true, `delete: ${done.status}`);
+            check(!(await claimsOnPage()).some((c) => c.id === id), "the claim is still on the page");
+            const again = await claimApi("DELETE", `/api/claims/${id}`, {
+              json: { expectedRevision: current.revision },
+            });
+            check(again.status === 200, `repeat delete: ${again.status}`);
+            const edit = await claimApi("PATCH", `/api/claims/${id}`, {
+              json: { text: "Edit after delete", expectedRevision: current.revision },
+            });
+            check(edit.status === 404 && edit.data.error === "not_found", `edit after delete: ${edit.status}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "adding claims: founder-authored, next free position, parallel adds never collide, a full block refuses a thirteenth",
+          async () => {
+            const before = await claimsOnPage();
+            const inBlock = (block, list) => list.filter((c) => c.block === block);
+            const maxPos = Math.max(...inBlock("key_partners", before).map((c) => c.position));
+            const one = await claimApi("POST", "/api/claims", {
+              json: { block: "key_partners", text: "  A partner\nclaim  ", origin: "ai_draft", position: 0 },
+            });
+            check(one.status === 201, `add: ${one.status} ${one.text.slice(0, 100)}`);
+            check(
+              one.data.claim.text === "A partner claim" &&
+                one.data.claim.origin === "founder" &&
+                one.data.claim.revision === 1,
+              `claim: ${JSON.stringify(one.data.claim)}`,
+            );
+            check(
+              one.data.claim.position === maxPos + 1,
+              `position ${one.data.claim.position}, expected ${maxPos + 1}`,
+            );
+            const adds = await Promise.all(
+              [1, 2, 3, 4].map((n) =>
+                claimApi("POST", "/api/claims", { json: { block: "key_partners", text: `Parallel partner ${n}` } }),
+              ),
+            );
+            check(
+              adds.every((r) => r.status === 201),
+              `parallel adds: ${adds.map((r) => r.status)}`,
+            );
+            const after = await claimsOnPage();
+            const positions = inBlock("key_partners", after).map((c) => c.position);
+            check(new Set(positions).size === positions.length, `duplicate positions: ${positions}`);
+            check(
+              inBlock("key_partners", after).length === inBlock("key_partners", before).length + 5,
+              "not every add landed",
+            );
+            // Fill the block to the cap of 12, then one more is refused.
+            let count = inBlock("key_partners", after).length;
+            while (count < 12) {
+              const r = await claimApi("POST", "/api/claims", {
+                json: { block: "key_partners", text: `Filler ${count}` },
+              });
+              check(r.status === 201, `filler ${count}: ${r.status}`);
+              count++;
+            }
+            const full = await claimApi("POST", "/api/claims", {
+              json: { block: "key_partners", text: "One too many" },
+            });
+            check(full.status === 409 && full.data.error === "block_full", `13th: ${full.status}`);
+            check(inBlock("key_partners", await claimsOnPage()).length === 12, "a refused add left a claim");
+            const other = await claimApi("POST", "/api/claims", {
+              json: { block: "channels", text: "Another block still works" },
+            });
+            check(other.status === 201, `other block: ${other.status}`);
+            const page = await pageOf("/project");
+            check(page.text.includes("This block is full"), "the full block does not say so");
+            check(
+              page.text.includes("Another block still works") && page.text.includes("Parallel partner 1"),
+              "added claims are not on the page",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the canvas page renders the editor with distinct AI and founder badges and keeps claim text safe",
+          async () => {
+            const nasty = `<script>alert("x")</script> & "quotes"`;
+            const claims = await claimsOnPage();
+            const target = claims.find((c) => c.origin === "ai_draft");
+            const r = await claimApi("PATCH", `/api/claims/${target.id}`, {
+              json: { text: nasty, expectedRevision: target.revision },
+            });
+            check(r.status === 200, `save: ${r.status}`);
+            const page = await pageOf("/project");
+            check(!page.text.includes("<script>alert"), "founder text was rendered unescaped");
+            check(page.text.includes("AI draft") && page.text.includes("You"), "badges missing");
+            check(
+              /aria-label="Edit claim: /.test(page.text) && /aria-label="Delete claim: /.test(page.text),
+              "claims have no Edit/Delete buttons",
+            );
+            check(page.text.includes("Add a claim"), "no way to add a claim");
+            check(
+              page.text.includes("Treat this as a first draft"),
+              "the AI-draft notice is gone while AI claims remain",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
           "through the real database API a founder cannot read or write the hidden persona",
           async () => {
             if (!SUPABASE_URL || !SUPABASE_ANON_KEY)
@@ -1814,6 +2173,36 @@ const steps = [
               }),
             });
             check([401, 403].includes(forgedFlag.status), `a flag was forged: ${forgedFlag.status}`);
+            // Claims: a founder may edit their own through the API, but the database owns revision and origin.
+            const [ownClaim] = (await claimsOnPage()).filter((c) => c.origin === "founder");
+            const patched = await rest(`canvas_claims?id=eq.${ownClaim.id}`, {
+              method: "PATCH",
+              headers: { Prefer: "return=representation" },
+              body: JSON.stringify({ text: "Edited straight through PostgREST", revision: 99, origin: "ai_draft" }),
+            });
+            const [row] = JSON.parse(patched.text);
+            check(
+              patched.status === 200 && row.revision === ownClaim.revision + 1 && row.origin === "founder",
+              `direct edit: ${patched.status} ${patched.text.slice(0, 120)}`,
+            );
+            const moved = await rest(`canvas_claims?id=eq.${ownClaim.id}`, {
+              method: "PATCH",
+              body: JSON.stringify({ block: "channels" }),
+            });
+            check(moved.status >= 400, `a claim was moved through PostgREST: ${moved.status}`);
+            const anon = await fetch(`${SUPABASE_URL}/rest/v1/canvas_claims?id=eq.${ownClaim.id}`, {
+              method: "PATCH",
+              headers: {
+                apikey: SUPABASE_ANON_KEY,
+                "Content-Type": "application/json",
+                Prefer: "return=representation",
+              },
+              body: JSON.stringify({ text: "anon edit" }),
+            });
+            check(
+              anon.status === 401 || anon.status === 403 || (await anon.text()) === "[]",
+              `anon edited a claim: ${anon.status}`,
+            );
             // Resume primitives: the lease, the key and the activity clock are the server's alone.
             for (const [column, value] of [
               ["reply_started_at", null],
@@ -1867,6 +2256,7 @@ const steps = [
           "another founder cannot see, send to, retry, end or start from this founder's rehearsal",
           async () => {
             const founderA = new Map(jar);
+            const [foreignClaim] = await claimsOnPage();
             try {
               jar.clear();
               await request("/api/auth/signup", {
@@ -1883,6 +2273,19 @@ const steps = [
               const card = await request(`/rehearsal/${sessionTwo}/scorecard`);
               check(card.status === 302 && card.location === "/rehearsal", `scorecard page: ${card.status}`);
               check(!card.text.includes("Question number"), "the scorecard page leaked a transcript");
+              const peek = await claimApi("PATCH", `/api/claims/${foreignClaim.id}`, {
+                json: { text: "B tampers", expectedRevision: foreignClaim.revision },
+              });
+              check(peek.status === 404 && peek.data?.error === "not_found", `claim edit: ${peek.status}`);
+              check(!peek.text.includes(foreignClaim.text), "an edit refusal leaked the claim's text");
+              const wipe = await claimApi("DELETE", `/api/claims/${foreignClaim.id}`, {
+                json: { expectedRevision: foreignClaim.revision },
+              });
+              check(wipe.status === 200 || wipe.status === 404, `claim delete: ${wipe.status}`);
+              const noProject = await claimApi("POST", "/api/claims", {
+                json: { block: "channels", text: "No project yet" },
+              });
+              check(noProject.status === 404, `claim add without a project: ${noProject.status}`);
               const foreignState = await getJson(stateApi(sessionTwo));
               check(foreignState.status === 404, `state: ${foreignState.status}`);
               check(!foreignState.text.includes("Question number"), "the state route leaked a transcript");
@@ -1906,6 +2309,8 @@ const steps = [
             }
             const mine = await pageOf(`/rehearsal/${sessionTwo}`);
             check(mine.status === 200 && mine.text.includes("Questions used: 8 of 8"), "the owner lost access");
+            const stillThere = (await claimsOnPage()).find((c) => c.id === foreignClaim.id);
+            check(stillThere?.text === foreignClaim.text, "another founder's request changed or deleted the claim");
             const mineCard = await pageOf(`/rehearsal/${sessionTwo}/scorecard`);
             check(
               mineCard.status === 200 && flat(mineCard.text).includes("8 of 8 questions"),

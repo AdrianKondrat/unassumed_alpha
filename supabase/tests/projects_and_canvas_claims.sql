@@ -90,13 +90,7 @@ begin
     raise exception 'duplicate (project, block, position) was accepted';
   exception when unique_violation then null; end;
 
-  -- No client DELETE and no client claim UPDATE in this slice (no policy => zero rows affected).
-  update public.canvas_claims set text = 'changed';
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'claim update affected % rows', n; end if;
-  delete from public.canvas_claims;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'claim delete affected % rows', n; end if;
+  -- Claim UPDATE and DELETE arrived with S-03 (see canvas_claims_editing.sql). Projects still have no client DELETE.
   delete from public.projects;
   get diagnostics n = row_count;
   if n <> 0 then raise exception 'project delete affected % rows', n; end if;

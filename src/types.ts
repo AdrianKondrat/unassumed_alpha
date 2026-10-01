@@ -48,6 +48,16 @@ export interface CanvasClaim {
   created_at: string;
 }
 
+/** A claim as it leaves the server for the editor island: no project id, no timestamps. */
+export interface PublicClaim {
+  id: string;
+  block: CanvasBlockKey;
+  position: number;
+  text: string;
+  origin: ClaimOrigin;
+  revision: number;
+}
+
 export type AssumptionStatus = "suggested" | "rejected" | "active" | "superseded" | "retired";
 
 /** The three states a durable (accepted) assumption can be moved between by hand (FR-011). */

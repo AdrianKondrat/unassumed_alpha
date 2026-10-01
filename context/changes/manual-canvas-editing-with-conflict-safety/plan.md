@@ -1,5 +1,7 @@
 # Manual Canvas Editing with Conflict Safety Implementation Plan
 
+> **IMPLEMENTED on `mvp` (2026-10-01, session 3), reconciled against the real S-02 schema.** See "Implementation notes" at the end of Progress. Names differ from the text below: the migration is `20261001100700_canvas_claims_editing.sql`, the version column is `revision`, provenance is `origin`, there is no `updated_at`, routes take `expectedRevision`, and new claims go through the `add_canvas_claim` DB function.
+
 > **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** This plan assumed an S-02 schema that the real S-02 plan does not use. Use S-02's actual `canvas_claims`: provenance column is `origin` (`'ai_draft' | 'founder'`), the version column is `revision` (not `version`), and there is **no `workspace_id` and no `updated_at`** on claims. Tenant access goes through `projects.workspace_id` via S-02's `is_project_member(project uuid)` helper. So: (1) the update/delete RLS policies must use that helper; (2) the version-bump trigger must also add `updated_at` if wanted (add the column in this migration); (3) editing a claim sets `origin = 'founder'` (replace every `author_kind = 'founder'` below); (4) the immutable-column guard covers `project_id` and `block`; (5) S-02 has a `unique (project_id, block, position)` constraint, so new claims need the next free `position` in the block and deletes leave gaps (fine). S-02's canvas page is `src/pages/project/index.astro`, and its claim badge component is `src/components/canvas/ClaimCard.astro`; the editor island replaces/extends those.
 
 ## Overview
@@ -260,47 +262,57 @@ Additive migration on a table that S-02 creates; no data backfill. If S-02's sch
 
 #### Automated
 
-- [ ] 1.1 Migrations apply on a clean DB: `npx supabase db reset`
-- [ ] 1.2 Assertion script passes: `psql ... -f supabase/tests/canvas_conflict_safety.sql`
-- [ ] 1.3 DB lint is clean: `npx supabase db lint`
+- [x] 1.1 Migrations apply on a clean DB: `npx supabase db reset` (applied with `stack.sh reset`)
+- [x] 1.2 Assertion script passes: `psql ... -f supabase/tests/canvas_conflict_safety.sql` (the script is `supabase/tests/canvas_claims_editing.sql`; 19 mutations, 16 caught, 3 equivalent, see notes; 12 parallel adds: 12 distinct positions, and 5 of 12 collide without the lock)
+- [ ] 1.3 DB lint is clean: `npx supabase db lint` (needs Docker; not possible in the sandbox)
 
 #### Manual
 
-- [ ] 1.4 In Studio, updating a claim twice shows `version` going 1 → 2 → 3 and `updated_at` changing
+- [ ] 1.4 In Studio, updating a claim twice shows `version` going 1 → 2 → 3 and `updated_at` changing (not done: Studio is unavailable here; the revision sequence 1 → 2 → 3 is asserted in SQL, and there is no `updated_at`)
 
 ### Phase 2: Claims API
 
 #### Automated
 
-- [ ] 2.1 Type checking and lint pass: `npm run lint`
-- [ ] 2.2 Production build succeeds: `npm run build`
+- [x] 2.1 Type checking and lint pass: `npm run lint` (plus `npx astro check` and `npm run test:canvas-edit`, 10 checks, 10 mutations caught)
+- [x] 2.2 Production build succeeds: `npm run build`
 
 #### Manual
 
-- [ ] 2.3 PATCH with current version returns 200; stale version returns 409 with saved row; unauthenticated returns 401
+- [x] 2.3 PATCH with current version returns 200; stale version returns 409 with saved row; unauthenticated returns 401 (smoke, incl. a same-revision race that always gives one 200 and one 409)
 
 ### Phase 3: Editor UI
 
 #### Automated
 
-- [ ] 3.1 Lint and format pass: `npm run lint && npm run format`
-- [ ] 3.2 Production build succeeds: `npm run build`
+- [x] 3.1 Lint and format pass: `npm run lint && npm run format`
+- [x] 3.2 Production build succeeds: `npm run build`
 
 #### Manual
 
-- [ ] 3.3 Editing, adding and deleting a claim persists after refresh
-- [ ] 3.4 Editing an AI-drafted claim changes its badge to founder-authored
-- [ ] 3.5 Two-tab edit shows the resolver; Keep mine saves, Use saved discards
-- [ ] 3.6 Two consecutive saves in one tab never conflict with each other
-- [ ] 3.7 Keyboard-only operation works for edit, save, cancel and the resolver
+- [x] 3.3 Editing, adding and deleting a claim persists after refresh (Chromium)
+- [x] 3.4 Editing an AI-drafted claim changes its badge to founder-authored (Chromium)
+- [x] 3.5 Two-tab edit shows the resolver; Keep mine saves, Use saved discards (Chromium)
+- [x] 3.6 Two consecutive saves in one tab never conflict with each other (smoke and Chromium)
+- [x] 3.7 Keyboard-only operation works for edit, save, cancel and the resolver (Chromium: Enter, Ctrl+Enter, Escape, focus lands on the resolver and returns to Edit)
 
 ### Phase 4: Smoke coverage and hardening
 
 #### Automated
 
-- [ ] 4.1 Smoke passes against a running server with local Supabase: `npm run smoke`
-- [ ] 4.2 Lint and build pass: `npm run lint && npm run build`
+- [x] 4.1 Smoke passes against a running server with local Supabase: `npm run smoke` (120 steps)
+- [x] 4.2 Lint and build pass: `npm run lint && npm run build`
 
 #### Manual
 
-- [ ] 4.3 Phase 3 two-tab checklist re-run against `npm run preview`
+- [x] 4.3 Phase 3 two-tab checklist re-run against `npm run preview` (Chromium script against the production preview)
+
+### Implementation notes
+
+- **Schema** (`20261001100700_canvas_claims_editing.sql`, additive): UPDATE and DELETE policies through `is_project_member`; the `canvas_claims_guard` BEFORE UPDATE trigger keeps id, project, block, position and `created_at` fixed, bumps `revision` by exactly one when the text changes, sets `origin = 'founder'` on a text change, and leaves a save that changes nothing completely untouched (no bump, same origin), whatever the caller sends; `add_canvas_claim(project, block, text)` (security invoker, per-block advisory lock, next free position = max + 1, cap of 12 per block, returns `{ok, claim}` or `{ok: false, code: 'block_full'}`). No `updated_at` column was added.
+- **Pure module** `src/lib/services/canvas-edit.ts`: claim text is one short line (line breaks collapse, 1..280 after trimming), `expectedRevision` must be a positive integer, extra body fields (origin, revision, block, position) are stripped, `toPublicClaim` allow-lists six fields, `statusForClaimCode`.
+- **Service** `claims.ts`: `updateClaim` is one conditional UPDATE on `(id, revision)`; zero rows is followed by a read that decides `not_found`, success (the saved text already equals what was sent) or `conflict` carrying the saved claim. `deleteClaim` is revision-checked, a missing claim counts as deleted. `createClaim` resolves the founder's own project server-side (no project id from the client).
+- **Routes**: `POST /api/claims`, `PATCH` and `DELETE /api/claims/[id]` (JSON only; 401, 400, 404, 409 `conflict` with `current`, 409 `block_full`, 415).
+- **UI**: `/project` renders the island `CanvasEditor` (hook `useClaimEditor`, `ClaimItem`, `AddClaim`, `ConflictResolver`); saves are explicit (Save/Cancel, Escape, Ctrl/Cmd+Enter); Keep mine re-saves against the revision that won, Use saved adopts it; a claim deleted elsewhere offers "Add my wording as a new claim"; delete asks first and says assumptions drawn from the claim keep their wording but lose the link (the S-04 link rows cascade). A founder who prefers to write it all can start from `/project?blank=1`; once claims exist the page always shows the editor, and a canvas emptied by hand offers the AI draft again. The read-only `CanvasBoard.astro` and `ClaimCard.astro` were removed.
+- **Verification**: SQL script (19 mutations: 16 caught; the 3 survivors, "project not immutable" and the two "policy open to everyone" variants, are equivalent because an UPDATE or DELETE with a WHERE also needs SELECT visibility and the update policy's WITH CHECK refuses a move to another project); `test:canvas-edit`; 18 new smoke steps (120 total) incl. the race (three rounds of two simultaneous saves: always one 200 and one 409 carrying the winner's text), the stale and repeat delete, parallel adds and the cap, escaped founder text, island props allow-listed, another founder gets 404 and cannot change or delete a claim, and the direct PostgREST edit where the database still owns revision and origin; 9 app-level mutations caught (removing the revision check makes both racing saves return 200); a Chromium script covered edit, Escape, keyboard-only, add, delete with confirmation, the two-tab conflict with both resolutions, deleted-elsewhere, the 280-character counter, no horizontal scroll at 390 px, and the blank canvas.
+- **Not verified**: `npx supabase db lint` (needs Docker) and the Studio check (1.4).

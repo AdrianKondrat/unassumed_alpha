@@ -17,7 +17,8 @@
     "test:assumptions": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-assumption-suggest.mjs",
     "test:rehearsal": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-rehearsal-persona.mjs",
     "test:scorecard": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-scorecard.mjs",
-    "test:rehearsal-resume": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-rehearsal-resume.mjs"
+    "test:rehearsal-resume": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-rehearsal-resume.mjs",
+    "test:canvas-edit": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-canvas-edit.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",
