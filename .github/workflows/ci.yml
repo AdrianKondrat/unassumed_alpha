@@ -41,7 +41,9 @@ jobs:
           cache: npm
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned (matches the `supabase` devDependency): "latest" makes the action call the GitHub API
+          # unauthenticated to resolve the release, which fails with "rate limit exceeded" on busy runners.
+          version: 2.117.0
       - run: npm ci
       - name: Start local Supabase
         run: |
