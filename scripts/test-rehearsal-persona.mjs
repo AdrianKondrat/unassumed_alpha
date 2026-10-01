@@ -201,6 +201,7 @@ step("error codes map to the documented statuses; unknown codes are 500", () => 
     not_found: 404,
     assumption_not_found: 404,
     not_active: 409,
+    not_ended: 409,
     reply_pending: 409,
     cap_reached: 409,
     nothing_to_retry: 409,

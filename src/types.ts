@@ -92,3 +92,33 @@ export interface RehearsalTurn {
   question: string;
   reply: string | null;
 }
+
+/** The five question-quality labels a scorecard can flag (FR-015). Each names a problem found. */
+export type ScoreLabel = "leading" | "hypothetical" | "solution_biased" | "past_behavior" | "specificity";
+
+export type ScorecardStatus = "scoring" | "ready" | "failed" | "insufficient";
+
+export interface ScorecardFlag {
+  seq: number;
+  label: ScoreLabel;
+  /** Exact founder text, copied from the stored turn by the database. */
+  quote: string;
+  explanation: string;
+}
+
+export interface ScorecardRewrite {
+  seq: number;
+  original: string;
+  suggestion: string;
+}
+
+export interface Scorecard {
+  session_id: string;
+  status: ScorecardStatus;
+  summary: string | null;
+  error_kind: "timeout" | "ai_failed" | "invalid_output" | "server_error" | null;
+  turns_scored: number;
+  turns_flagged: number;
+  flags: ScorecardFlag[];
+  rewrites: ScorecardRewrite[];
+}

@@ -27,18 +27,18 @@ First-time founders tend to ask their prospective customers leading, hypothetica
 
 ## At a glance
 
-| ID   | Change ID                                  | Outcome (user can …)                                                                                          | Prerequisites | PRD refs                       | Status |
-| ---- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------ | ------ |
-| F-01 | data-workspace-scaffold                    | (foundation) Supabase migration tooling + minimal founder/workspace schema                                    | —             | FR-004                         | done   |
-| F-02 | ai-provider-integration                    | (foundation) server-only AI-provider call path; secrets/persona never client-side                             | —             | NFR (privacy/latency)          | done   |
-| F-03 | mvp-branch-deploy-pipeline                 | (foundation) CI deploys the MVP branch to its own Cloudflare Workers environment (the `unassumed-mvp` Worker) | —             | FR-018                         | built  |
-| S-01 | verified-account-and-workspace             | sign up, verify email, sign in/out, reset password, land in own workspace                                     | F-01          | FR-001, FR-002, FR-003, FR-004 | done   |
-| S-02 | ai-drafted-canvas-from-brief               | create the one project from a brief and get an AI-drafted canvas                                              | S-01, F-02    | FR-005, FR-006                 | done   |
-| S-03 | manual-canvas-editing-with-conflict-safety | edit canvas claims manually with edits protected against silent overwrite                                     | S-02          | FR-007, FR-008                 | ready  |
-| S-04 | assumption-suggestion-and-lifecycle        | request AI-suggested assumptions, accept/edit/reject them, set lifecycle status                               | S-02, F-02    | FR-009, FR-010, FR-011         | done   |
-| S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | ready  |
-| S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | ready  |
-| S-07 | resumable-rehearsal-sessions               | resume a disrupted session without losing or duplicating turns                                                | S-05          | FR-017                         | ready  |
+| ID   | Change ID                                  | Outcome (user can …)                                                                                          | Prerequisites | PRD refs                       | Status      |
+| ---- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------- | ------------------------------ | ----------- |
+| F-01 | data-workspace-scaffold                    | (foundation) Supabase migration tooling + minimal founder/workspace schema                                    | —             | FR-004                         | done        |
+| F-02 | ai-provider-integration                    | (foundation) server-only AI-provider call path; secrets/persona never client-side                             | —             | NFR (privacy/latency)          | done        |
+| F-03 | mvp-branch-deploy-pipeline                 | (foundation) CI deploys the MVP branch to its own Cloudflare Workers environment (the `unassumed-mvp` Worker) | —             | FR-018                         | built       |
+| S-01 | verified-account-and-workspace             | sign up, verify email, sign in/out, reset password, land in own workspace                                     | F-01          | FR-001, FR-002, FR-003, FR-004 | done        |
+| S-02 | ai-drafted-canvas-from-brief               | create the one project from a brief and get an AI-drafted canvas                                              | S-01, F-02    | FR-005, FR-006                 | done        |
+| S-03 | manual-canvas-editing-with-conflict-safety | edit canvas claims manually with edits protected against silent overwrite                                     | S-02          | FR-007, FR-008                 | ready       |
+| S-04 | assumption-suggestion-and-lifecycle        | request AI-suggested assumptions, accept/edit/reject them, set lifecycle status                               | S-02, F-02    | FR-009, FR-010, FR-011         | done        |
+| S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | ready       |
+| S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | in progress |
+| S-07 | resumable-rehearsal-sessions               | resume a disrupted session without losing or duplicating turns                                                | S-05          | FR-017                         | ready       |
 
 ## Streams
 
@@ -178,7 +178,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **Unknowns:**
   - ~~Can persona-turn scoring complete synchronously within Workers limits?~~ Resolved (`context/changes/rehearsal-scorecard/research.md`): yes on the Workers Paid plan with one batched call and a shared ~25s deadline; no Workflow/queue. Remaining check: measure p95 against the real model (plan Phase 5).
 - **Risk:** This is the core value-delivery moment of the whole release and the PRD's Primary Success Criterion in miniature — it's also the one place the tech-stack hand-off flagged an unresolved architecture question (edge runtime vs. background job) that must be settled before this slice can be planned.
-- **Status:** ready — the edge-runtime Unknown is resolved: synchronous batched scoring (see its plan and research.md). Plan needs reconciling with S-05's real columns first.
+- **Status:** in progress on `mvp` — schema, scoring module, deadline-bound service and `POST /api/rehearsal/sessions/[id]/score` are built and verified; the scorecard page/UI, fake-provider handler, smoke steps and docs wrap-up remain (see `context/foundation/handoff.md`, "RESUME HERE: S-06"). Scoring is triggered from the scorecard page rather than the end-session request.
 
 ### S-07: Resumable rehearsal sessions
 
@@ -194,18 +194,18 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 
 ## Backlog Handoff
 
-| Roadmap ID | Change ID                                  | Suggested issue title                                            | Ready for `/10x-plan` | Notes                                              |
-| ---------- | ------------------------------------------ | ---------------------------------------------------------------- | --------------------- | -------------------------------------------------- |
-| F-01       | data-workspace-scaffold                    | Stand up Supabase migrations + minimal workspace schema          | done                  | Implemented                                        |
-| F-02       | ai-provider-integration                    | Wire server-only AI-provider call path (OpenRouter)              | done                  | Implemented; unlocks the north star                |
-| F-03       | mvp-branch-deploy-pipeline                 | Add Cloudflare Workers deploy step to CI for the MVP branch      | built                 | Needs secrets + first push to `mvp` to confirm     |
-| S-01       | verified-account-and-workspace             | Close auth gaps (email verification, password reset) + workspace | done                  | Implemented                                        |
-| S-02       | ai-drafted-canvas-from-brief               | Project creation + AI-drafted canvas                             | done                  | Implemented                                        |
-| S-03       | manual-canvas-editing-with-conflict-safety | Manual canvas editing with conflict-safe saves                   | no                    | Ready after S-02; reconcile plan first             |
-| S-04       | assumption-suggestion-and-lifecycle        | AI-suggested assumptions + accept/edit/reject + lifecycle status | done                  | Implemented                                        |
-| S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | done                  | Implemented                                        |
-| S-06       | rehearsal-scorecard                        | Automatic post-session scorecard with cited flags                | no                    | Ready after S-05; Unknown resolved; reconcile plan |
-| S-07       | resumable-rehearsal-sessions               | Idempotent resume for disrupted rehearsal sessions               | no                    | Plan exists; after S-05                            |
+| Roadmap ID | Change ID                                  | Suggested issue title                                            | Ready for `/10x-plan` | Notes                                          |
+| ---------- | ------------------------------------------ | ---------------------------------------------------------------- | --------------------- | ---------------------------------------------- |
+| F-01       | data-workspace-scaffold                    | Stand up Supabase migrations + minimal workspace schema          | done                  | Implemented                                    |
+| F-02       | ai-provider-integration                    | Wire server-only AI-provider call path (OpenRouter)              | done                  | Implemented; unlocks the north star            |
+| F-03       | mvp-branch-deploy-pipeline                 | Add Cloudflare Workers deploy step to CI for the MVP branch      | built                 | Needs secrets + first push to `mvp` to confirm |
+| S-01       | verified-account-and-workspace             | Close auth gaps (email verification, password reset) + workspace | done                  | Implemented                                    |
+| S-02       | ai-drafted-canvas-from-brief               | Project creation + AI-drafted canvas                             | done                  | Implemented                                    |
+| S-03       | manual-canvas-editing-with-conflict-safety | Manual canvas editing with conflict-safe saves                   | no                    | Ready after S-02; reconcile plan first         |
+| S-04       | assumption-suggestion-and-lifecycle        | AI-suggested assumptions + accept/edit/reject + lifecycle status | done                  | Implemented                                    |
+| S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | done                  | Implemented                                    |
+| S-06       | rehearsal-scorecard                        | Automatic post-session scorecard with cited flags                | in progress           | Phases 1-3 built; UI + smoke remain            |
+| S-07       | resumable-rehearsal-sessions               | Idempotent resume for disrupted rehearsal sessions               | no                    | Plan exists; after S-05                        |
 
 ## Open Roadmap Questions
 

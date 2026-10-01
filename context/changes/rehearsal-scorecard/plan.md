@@ -1,5 +1,7 @@
 # Rehearsal Scorecard (S-06) Implementation Plan
 
+> **IN PROGRESS on `mvp` (updated 2026-10-01, session 3).** Phases 1-3 are built and verified (see "Implementation notes" at the end of Progress); Phase 4 (UI), the fake-provider handler, smoke steps and docs wrap-up remain. Read `context/foundation/handoff.md` section "RESUME HERE: S-06" first: it lists the exact remaining steps and the design decisions already made, some of which deviate from this plan (scoring is triggered by the scorecard page, not the end-session request).
+
 > **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** (1) Real S-05 columns (see its plan): `rehearsal_sessions(id, project_id, assumption_id, status in ('active','ended'), ended_reason in ('user','cap'), created_at, ended_at)` and `rehearsal_turns(session_id, seq 1..8, question, reply, …)`: a founder turn is the `question` of each row and its position is `seq`; there is no `role`/`content`/`position` and no per-session `founder_id` (ownership is via project → workspace). Replace the plan's assumed names. Persona replies are never scored. (2) Writes to sessions/turns/scorecards are service-role only (S-05's `src/lib/supabase-admin.ts`); scorecards follow the same "no client write policies" rule. (3) The `complete()` extension this plan asks for (`timeoutMs`, `retry`) **already exists** from F-02; skip that step. Also use `jsonMode: true`. (4) Wire scoring into S-05's end-session path (manual end and cap auto-end) as the plan says. (5) The Workers Paid plan requirement still needs the founder's confirmation.
 
 ## Overview
@@ -270,31 +272,31 @@ No existing data. Column names referencing S-05 tables need reconciliation when 
 
 #### Automated
 
-- [ ] 1.1 Scorecard unit tests pass: `npm run test:scorecard`
-- [ ] 1.2 Type checking passes: `npx astro check`
-- [ ] 1.3 Linting passes: `npm run lint`
+- [x] 1.1 Scorecard unit tests pass: `npm run test:scorecard`
+- [x] 1.2 Type checking passes: `npx astro check`
+- [x] 1.3 Linting passes: `npm run lint`
 
 #### Manual
 
-- [ ] 1.4 Prompt reviewed: never asks the model to judge the idea or viability
+- [x] 1.4 Prompt reviewed: never asks the model to judge the idea or viability (read; real-model behaviour unverified)
 
 ### Phase 2: Schema and RLS
 
 #### Automated
 
-- [ ] 2.1 Migration applies cleanly: `npx supabase db reset`
-- [ ] 2.2 SQL tests pass: `psql ... -v ON_ERROR_STOP=1 -f supabase/tests/scorecards.sql`
+- [x] 2.1 Migration applies cleanly: `npx supabase db reset` (applied with `stack.sh reset`)
+- [x] 2.2 SQL tests pass: `psql ... -v ON_ERROR_STOP=1 -f supabase/tests/scorecards.sql`
 
 #### Manual
 
-- [ ] 2.3 RLS policies reviewed: no anon access, no client write policies
+- [x] 2.3 RLS policies reviewed: no anon access, no client write policies (asserted in SQL, mutation-checked)
 
 ### Phase 3: Scoring service and API
 
 #### Automated
 
-- [ ] 3.1 Service tests cover ready, insufficient, invalid_output, timeout, deadline exhaustion, already_scoring
-- [ ] 3.2 Type checking and lint pass: `npx astro check && npm run lint`
+- [x] 3.1 Service tests cover ready, insufficient, invalid_output, timeout, deadline exhaustion, already_scoring (attempt loop in `scorecard-run.ts` tested with a stubbed model and clock; insufficient and in_progress are DB-function outcomes asserted in SQL and will be asserted end-to-end in smoke)
+- [x] 3.2 Type checking and lint pass: `npx astro check && npm run lint`
 
 #### Manual
 
@@ -325,3 +327,14 @@ No existing data. Column names referencing S-05 tables need reconciliation when 
 
 - [ ] 5.2 Leading-question transcript gets sensible flags; a good transcript gets few or none
 - [ ] 5.3 Beta disclaimer and rewrite appear in every ready scorecard
+
+### Implementation notes (phases 1-3 done; 4-5 pending)
+
+- **Built and verified so far (commit "S-06 part 1")**: `src/lib/services/scorecard.ts` (labels, prompt, zod schema, `parseScore`), `scorecard-run.ts` (attempt loop with injected model and clock), `scorecard-service.ts` (`scoreSession`), `scorecards.ts` (RLS reads), route `POST /api/rehearsal/sessions/[id]/score`, migration `20261001100500_scorecards.sql`, `supabase/tests/scorecards.sql`, `scripts/test-scorecard.mjs` (24 checks, `npm run test:scorecard`, CI step added), types in `src/types.ts`, `not_ended` -> 409 in `rehearsal-http.ts`. Lint, `astro check`, all offline tests, all SQL tests, build and the existing 93 smoke steps pass. The offline module/loop (25 mutations) and the SQL (31 mutations) were mutation-checked; nothing at HTTP or UI level exists yet for scoring.
+- **Deviation: scoring is not run inside the end-session request.** The scorecard page `/rehearsal/[id]/scorecard` triggers it (an island POSTs `/score` on arrival when there is no scorecard, polls on `in_progress`, shows Retry on `failed`). Reasons: ending a session stays instant, the cap-ending 8th reply request does not also wait for scoring, expired sessions (S-07) and sessions ended in another tab are scored the same way, and no AI is spent unless the founder is present.
+- **Deviation: no numeric score.** The scorecard shows derived counts (`turns_flagged` of `turns_scored`) and prose; nothing resembling a viability score.
+- **Labels are problems found** (leading, hypothetical, solution_biased, past_behavior = "not about the past", specificity = "too vague"); display names are in `LABEL_META`.
+- **Quotes are exact twice over**: `parseScore` takes them from the stored turns and `store_scorecard` copies `question` into `quote`/`original` in SQL (the model's text for them is ignored). The viability-wording screen applies only to model-written prose, never to a founder's quoted words. A rewrite that is itself hypothetical or repeats the question fails the attempt.
+- **Lease and state machine** (DB functions, service-role only, execute grants asserted): `claim_scorecard(session)` -> `not_found | not_ended | ready | insufficient | in_progress | claimed` (60 s stale lease, row-locked); `store_scorecard(...)` stores only a claimed attempt, replaces flags/rewrites atomically and requires >= 1 rewrite for `ready`. A failed scorecard can be re-claimed (Retry). Zero turns -> `insufficient`, no AI call.
+- **Budget**: 12 s per attempt, shared 25 s deadline, a second attempt only with >= 6 s left (`scorecard-run.ts`), `complete({ taskKind: "score", jsonMode: true, timeoutMs, retry: false })`.
+- **Still to do** (Phase 4/5 and wrap-up): scorecard page + island, links, fake-provider scoring handler, smoke steps, screenshots, docs. Phase 5 (live latency/wording script against the real model) cannot run in the sandbox (`openrouter.ai` blocked): write `scripts/verify-scorecard-live.mjs` if time allows and leave 5.1-5.3 unticked.

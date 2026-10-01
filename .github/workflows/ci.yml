@@ -24,6 +24,7 @@ jobs:
       - run: npm run test:canvas
       - run: npm run test:assumptions
       - run: npm run test:rehearsal
+      - run: npm run test:scorecard
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

@@ -9,6 +9,7 @@ export function statusForCode(code: string): number {
     case "assumption_not_found":
       return 404;
     case "not_active":
+    case "not_ended":
     case "reply_pending":
     case "cap_reached":
     case "nothing_to_retry":

@@ -1,7 +1,7 @@
 ---
 change_id: rehearsal-scorecard
 title: Rehearsal scorecard (roadmap S-06, north star)
-status: planned
+status: in-progress
 created: 2026-10-01
 updated: 2026-10-01
 archived_at: null
