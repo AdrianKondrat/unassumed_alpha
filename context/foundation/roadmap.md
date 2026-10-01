@@ -53,7 +53,7 @@ Navigation aid — groups items that share a Prerequisites chain. Canonical orde
 
 ## Baseline
 
-> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
+> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01, S-02 and S-04 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
 
 What's already in place in the codebase as of 2026-09-27 (auto-researched + user-confirmed). Foundations below assume these are present and do NOT re-scaffold them.
 
@@ -165,7 +165,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** The hidden-persona system is the riskiest, most novel piece of the release; the PRD's own fallback (curated response templates) is an explicit option here if usability targets are missed under the capacity constraint.
-- **Status:** ready — plan needs two small reconciliations first (see handoff).
+- **Status:** ready — next to build (S-02 and S-04 are done). Settled design decisions and the implementation checklist are in `context/foundation/handoff.md` ("RESUME HERE: S-05").
 
 ### S-06: Rehearsal scorecard _(north star)_
 
