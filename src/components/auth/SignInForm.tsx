@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { Mail, Lock, LogIn } from "lucide-react";
 import { FormField } from "@/components/auth/FormField";
 import { PasswordToggle } from "@/components/auth/PasswordToggle";
 import { SubmitButton } from "@/components/auth/SubmitButton";
@@ -40,7 +39,7 @@ export default function SignInForm({ serverError }: Props) {
   }
 
   return (
-    <form method="POST" action="/api/auth/signin" className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <form method="POST" action="/api/auth/signin" className="space-y-5" onSubmit={handleSubmit} noValidate>
       <FormField
         id="email"
         type="email"
@@ -50,9 +49,9 @@ export default function SignInForm({ serverError }: Props) {
           setEmail(v);
           clearError("email");
         }}
-        placeholder="you@example.com"
+        placeholder="you@your-next-thing.com"
+        autoComplete="email"
         error={errors.email}
-        icon={<Mail className="size-4" />}
       />
 
       <FormField
@@ -65,8 +64,8 @@ export default function SignInForm({ serverError }: Props) {
           clearError("password");
         }}
         placeholder="Your password"
+        autoComplete="current-password"
         error={errors.password}
-        icon={<Lock className="size-4" />}
         endContent={
           <PasswordToggle
             visible={showPassword}
@@ -77,11 +76,15 @@ export default function SignInForm({ serverError }: Props) {
         }
       />
 
+      <div className="-mt-2 text-right">
+        <a href="/auth/forgot-password" className="link text-sm">
+          Forgot password?
+        </a>
+      </div>
+
       <ServerError message={serverError} />
 
-      <SubmitButton pendingText="Signing in..." icon={<LogIn className="size-4" />}>
-        Sign in
-      </SubmitButton>
+      <SubmitButton pendingText="Signing in…">Sign in</SubmitButton>
     </form>
   );
 }

@@ -64,6 +64,8 @@ const astroConfig = defineConfig({
     parserOptions: { projectService: false, project: "./tsconfig.json", tsconfigRootDir: import.meta.dirname },
   },
   rules: {
+    // typescript-eslint crashes on a top-level `return Astro.redirect(...)` in frontmatter with this rule enabled.
+    "@typescript-eslint/no-misused-promises": "off",
     "astro/no-set-html-directive": "error",
     "astro/no-unused-css-selector": "warn",
     "astro/prefer-class-list-directive": "warn",

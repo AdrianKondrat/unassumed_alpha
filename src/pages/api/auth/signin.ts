@@ -1,20 +1,37 @@
 import type { APIRoute } from "astro";
 import { createClient } from "@/lib/supabase";
+import { authErrorMessage, errorRedirect, firstIssue, formToObject, signInSchema } from "@/lib/auth";
+
+export const prerender = false;
 
 export const POST: APIRoute = async (context) => {
-  const form = await context.request.formData();
-  const email = form.get("email") as string;
-  const password = form.get("password") as string;
+  const parsed = signInSchema.safeParse(formToObject(await context.request.formData()));
+  if (!parsed.success) {
+    return context.redirect(errorRedirect("/auth/signin", firstIssue(parsed.error)));
+  }
+  const { email, password } = parsed.data;
 
   const supabase = createClient(context.request.headers, context.cookies);
   if (!supabase) {
-    return context.redirect(`/auth/signin?error=${encodeURIComponent("Supabase is not configured")}`);
+    return context.redirect(errorRedirect("/auth/signin", "Supabase is not configured"));
   }
+
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    return context.redirect(`/auth/signin?error=${encodeURIComponent(error.message)}`);
+    if (error.code === "email_not_confirmed") {
+      // Only reachable with the correct password, so this does not reveal arbitrary accounts.
+      context.cookies.set("pending_email", email, {
+        path: "/auth",
+        httpOnly: true,
+        sameSite: "lax",
+        secure: context.url.protocol === "https:",
+        maxAge: 60 * 60,
+      });
+      return context.redirect("/auth/confirm-email?unverified=1");
+    }
+    return context.redirect(errorRedirect("/auth/signin", authErrorMessage(error)));
   }
 
-  return context.redirect("/");
+  return context.redirect("/dashboard");
 };

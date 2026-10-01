@@ -1,47 +1,52 @@
 ---
 import "../styles/global.css";
 import Banner from "@/components/Banner.astro";
+import AppNav from "@/components/AppNav.astro";
 import { missingConfigs } from "@/lib/config-status";
 
 interface Props {
   title?: string;
+  description?: string;
+  /** Show the signed-in app navigation. Auth pages turn it off. */
+  nav?: boolean;
+  /** Current nav item (see AppNav). */
+  current?: string;
 }
 
-const { title = "10x Astro Starter" } = Astro.props;
+const { title, description = "AI rehearsal for first-time founders.", nav = true, current } = Astro.props;
+const fullTitle = title ? `${title} · Unassumed` : "Unassumed";
 ---
 
 <!doctype html>
-<html lang="en">
+<html lang="en-GB">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <title>{title}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content={description} />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="theme-color" content="#f5f0e6" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.ico" sizes="32x32" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="preload" href="/fonts/archivo-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/fonts/jetbrains-mono-latin-var.woff2" as="font" type="font/woff2" crossorigin />
+    <title>{fullTitle}</title>
   </head>
-  <body>
+  <body class="min-h-screen">
+    <a
+      href="#content"
+      class="absolute -left-[9999px] top-0 z-50 bg-ink px-5 py-3 font-bold text-white focus:left-3 focus:top-3"
+    >
+      Skip to content
+    </a>
     {missingConfigs.map((cfg) => (
       <Banner variant="error">
-        <strong>Uwaga:</strong> {cfg.message}
-        {cfg.docsUrl && (
-          <>
-            {" "}
-            <a href={cfg.docsUrl} target="_blank" rel="noopener noreferrer">
-              {cfg.docsLabel ?? "Dokumentacja"}
-            </a>
-            .
-          </>
-        )}
+        <strong>Setup needed:</strong> {cfg.message}
       </Banner>
     ))}
-    <slot />
+    {nav && <AppNav current={current} />}
+    <main id="content">
+      <slot />
+    </main>
   </body>
 </html>
-
-<style>
-  html,
-  body {
-    margin: 0;
-    width: 100%;
-    height: 100%;
-  }
-</style>

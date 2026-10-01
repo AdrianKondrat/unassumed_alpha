@@ -1,0 +1,19 @@
+---
+interface Props {
+  href?: string;
+  class?: string;
+}
+const { href = "/", class: className } = Astro.props;
+---
+
+<a
+  href={href}
+  class:list={[
+    "inline-flex min-h-11 items-center text-[23px] font-black tracking-[-0.055em] text-ink no-underline",
+    className,
+  ]}
+  aria-label="Unassumed home"
+>
+  Un<span class="font-normal">assumed</span>
+  <i class="not-italic text-red-text">.</i>
+</a>

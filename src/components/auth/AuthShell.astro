@@ -1,0 +1,24 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import Wordmark from "@/components/brand/Wordmark.astro";
+
+interface Props {
+  title: string;
+  heading?: string;
+  lede?: string;
+}
+
+const { title, heading = title, lede } = Astro.props;
+---
+
+<Layout title={title} nav={false}>
+  <div class="mx-auto flex min-h-[calc(100vh-1px)] w-[min(460px,100%-32px)] flex-col justify-center py-10">
+    <Wordmark class="mb-8 self-start" />
+    <div class="card p-6 sm:p-8">
+      <h1 class="disp mb-2 text-[clamp(1.9rem,6vw,2.6rem)]">{heading}</h1>
+      {lede && <p class="mb-6 text-ink-soft">{lede}</p>}
+      <slot />
+    </div>
+    <p class="mono-note mt-6">Scores your questions, never your idea.</p>
+  </div>
+</Layout>

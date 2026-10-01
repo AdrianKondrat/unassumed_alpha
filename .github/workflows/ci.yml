@@ -4,7 +4,7 @@ on:
   push:
     branches: [master, mvp]
   pull_request:
-    branches: [master, mvp]
+    branches: [main, master, mvp]
 
 jobs:
   ci:
@@ -20,6 +20,7 @@ jobs:
       - run: npm run lint
       - run: npx astro check
       - run: npm run test:ai
+      - run: npm run test:auth
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -40,8 +41,14 @@ jobs:
       - run: npm ci
       - name: Start local Supabase
         run: |
-          supabase start -x studio,imgproxy,mailpit,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor
+          supabase start -x studio,imgproxy,edge-runtime,logflare,vector,realtime,storage-api,postgres-meta,supavisor
           supabase status -o env | grep -E '^(API_URL|ANON_KEY)=' > supabase.env
+      - name: Database assertions (RLS, constraints, triggers)
+        run: |
+          for f in supabase/tests/*.sql; do
+            echo "== $f"
+            psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
+          done
       - name: Configure secrets for build and preview
         run: |
           source supabase.env
@@ -52,7 +59,7 @@ jobs:
         run: |
           npm run preview -- --port 4321 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:4321/ && break; sleep 1; done
-          BASE_URL=http://localhost:4321 npm run smoke
+          BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 npm run smoke
       - if: always()
         run: supabase stop --no-backup
 

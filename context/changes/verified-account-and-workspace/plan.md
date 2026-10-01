@@ -271,56 +271,65 @@ Turning confirmations on only affects new signups; any existing local test users
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles. See `references/progress-format.md`.
 
+> Implementation notes (deviations from the plan, with reasons):
+>
+> - Emails link to `/auth/callback?token_hash=…&type=…` via custom templates (`supabase/templates/`), verified with `verifyOtp`, instead of relying on Supabase's default PKCE links. PKCE needs a single-use code-verifier cookie from the browser that signed up, so a link opened on another browser/phone (very common) or any stray visit to the callback fails with an "expired" error. `code` (PKCE) is still accepted as a fallback. Hosted projects must paste the templates in the dashboard (README, "MVP deploy").
+> - Minimum password length is 8 (config.toml, zod, forms), not 6.
+> - Unverified sign-in / signup / resend remember the address in a short-lived httpOnly cookie (`pending_email`, path `/auth`) rather than putting it in the URL.
+> - CI smoke job also runs `supabase/tests/*.sql`; PRs into `main` now trigger CI (the repo's default branch is `main`, not `master`).
+> - Verified against a real GoTrue + PostgREST + Postgres 16 stack built natively in the sandbox (no Docker): 30 smoke steps pass, including the emailed-link flows.
+> - Also done here: brand foundation (tokens, fonts, shared classes, app shell) so every screen matches the marketing site; ESLint rule `no-misused-promises` disabled for `.astro` files (typescript-eslint crashes on top-level `return Astro.redirect()`).
+
 ### Phase 1: Verification gate
 
 #### Automated
 
-- [ ] 1.1 Lint passes: `npm run lint`
-- [ ] 1.2 Type check passes: `npx astro check`
-- [ ] 1.3 Build passes: `npm run build`
+- [x] 1.1 Lint passes: `npm run lint`
+- [x] 1.2 Type check passes: `npx astro check`
+- [x] 1.3 Build passes: `npm run build`
 
 #### Manual
 
-- [ ] 1.4 Signing up shows "check your email"; the link in the local mail server signs the founder in and lands on `/dashboard`
-- [ ] 1.5 Signing in before verifying shows the verify-your-email prompt and resend works
-- [ ] 1.6 An expired or reused link shows a friendly error, not a raw Supabase message
-- [ ] 1.7 A tampered `next=https://evil.example` redirects to `/dashboard`
+- [x] 1.4 Signing up shows "check your email"; the link in the local mail server signs the founder in and lands on `/dashboard` (automated in smoke: emailed link signs in and lands on /dashboard)
+- [x] 1.5 Signing in before verifying shows the verify-your-email prompt and resend works (automated in smoke)
+- [x] 1.6 An expired or reused link shows a friendly error, not a raw Supabase message (automated in smoke: reused link shows friendly message)
+- [x] 1.7 A tampered `next=https://evil.example` redirects to `/dashboard` (callback tampering covered by smoke + `npm run test:auth` safeNext cases)
 
 ### Phase 2: Password reset
 
 #### Automated
 
-- [ ] 2.1 Lint passes: `npm run lint`
-- [ ] 2.2 Type check passes: `npx astro check`
-- [ ] 2.3 Build passes: `npm run build`
+- [x] 2.1 Lint passes: `npm run lint`
+- [x] 2.2 Type check passes: `npx astro check`
+- [x] 2.3 Build passes: `npm run build`
 
 #### Manual
 
-- [ ] 2.4 Reset email arrives, link opens the new-password page, new password works at sign-in and the old one does not
-- [ ] 2.5 Unknown email shows the same message as a known one
-- [ ] 2.6 Visiting `/auth/reset-password` signed out redirects to sign-in
+- [x] 2.4 Reset email arrives, link opens the new-password page, new password works at sign-in and the old one does not (automated in smoke)
+- [x] 2.5 Unknown email shows the same message as a known one (automated in smoke: identical redirect for known and unknown addresses)
+- [x] 2.6 Visiting `/auth/reset-password` signed out redirects to sign-in (automated in smoke)
 
 ### Phase 3: Workspace landing
 
 #### Automated
 
-- [ ] 3.1 Lint passes: `npm run lint`
-- [ ] 3.2 Type check passes: `npx astro check`
-- [ ] 3.3 Build passes: `npm run build`
+- [x] 3.1 Lint passes: `npm run lint`
+- [x] 3.2 Type check passes: `npx astro check`
+- [x] 3.3 Build passes: `npm run build`
 
 #### Manual
 
-- [ ] 3.4 After sign-in the dashboard shows the founder's workspace name and email
-- [ ] 3.5 Two founders each see only their own workspace
+- [x] 3.4 After sign-in the dashboard shows the founder's workspace name and email (automated in smoke; viewed in Chromium screenshots)
+- [ ] 3.5 Two founders each see only their own workspace (RLS isolation proven in supabase/tests/workspace_scaffold.sql; two founders in screenshots/smoke runs)
 
 ### Phase 4: Smoke test and CI
 
 #### Automated
 
-- [ ] 4.1 Smoke passes locally against `npm run dev` with local Supabase: `npm run smoke`
-- [ ] 4.2 Smoke passes in CI against the production preview
-- [ ] 4.3 Lint, type check and build still pass: `npm run lint && npx astro check && npm run build`
+- [x] 4.1 Smoke passes locally against `npm run dev` with local Supabase: `npm run smoke`
+- [ ] 4.2 Smoke passes in CI against the production preview (runs on first push to mvp; workflow validated with actionlint)
+- [x] 4.3 Lint, type check and build still pass: `npm run lint && npx astro check && npm run build`
 
 #### Manual
 
-- [ ] 4.4 CI smoke job is green on a pull request
+- [ ] 4.4 CI smoke job is green on a pull request (verify on the first CI run)

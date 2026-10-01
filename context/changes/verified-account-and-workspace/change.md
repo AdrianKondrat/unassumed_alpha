@@ -1,7 +1,7 @@
 ---
 change_id: verified-account-and-workspace
 title: Verified account and workspace
-status: planned
+status: implemented
 created: 2026-10-01
 updated: 2026-10-01
 archived_at: null

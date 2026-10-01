@@ -1,8 +1,40 @@
 ---
-import Welcome from "@/components/Welcome.astro";
 import Layout from "@/layouts/Layout.astro";
+
+if (Astro.locals.user) {
+  return Astro.redirect("/dashboard");
+}
 ---
 
-<Layout>
-  <Welcome />
+<Layout nav={false}>
+  <div class="mx-auto flex min-h-screen w-[min(1180px,100%-48px)] flex-col">
+    <header class="flex h-[88px] items-center gap-6 border-b border-ink">
+      <span class="text-[23px] font-black tracking-[-0.055em]">
+        Un<span class="font-normal">assumed</span>
+        <i class="not-italic text-red-text">.</i>
+      </span>
+      <span class="ml-auto font-mono text-[11px] tracking-[0.1em] text-ink-mute uppercase">Private beta</span>
+    </header>
+
+    <div class="flex flex-1 flex-col justify-center py-16">
+      <div class="eyebrow mb-8">
+        <i></i> AI rehearsal for first-time founders
+      </div>
+      <h1 class="disp max-w-[12ch] text-[clamp(3.2rem,9vw,7rem)]">
+        Your idea deserves <span class="mark">better questions.</span>
+      </h1>
+      <p class="mt-8 max-w-[34em] text-lg text-ink-soft">
+        Turn rough notes into named assumptions, rehearse the customer conversations that could break them, and get your
+        questions scored. Never your idea.
+      </p>
+      <div class="mt-10 flex flex-wrap items-center gap-4">
+        <a href="/auth/signup" class="btn btn-yellow">
+          Create your account
+        </a>
+        <a href="/auth/signin" class="link">
+          Sign in
+        </a>
+      </div>
+    </div>
+  </div>
 </Layout>

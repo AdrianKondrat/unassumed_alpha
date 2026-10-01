@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Unassumed">
+  <title>Unassumed</title>
+  <rect width="64" height="64" fill="#f5f0e6"/>
+  <path fill="#191915" fill-rule="evenodd" d="M11 11 V33 A19 19 0 0 0 49 33 V11 H37 V33 A7 7 0 0 1 23 33 V11 Z"/>
+  <rect x="52" y="43" width="10" height="10" fill="#c62a20"/>
+</svg>

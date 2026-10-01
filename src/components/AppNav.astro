@@ -1,0 +1,63 @@
+---
+import Wordmark from "@/components/brand/Wordmark.astro";
+
+interface Props {
+  current?: string;
+}
+
+const { current } = Astro.props;
+const { user } = Astro.locals;
+
+// Add an entry here when a slice ships its page. `key` is matched against the `current` prop.
+const items: { key: string; href: string; label: string }[] = [{ key: "dashboard", href: "/dashboard", label: "Home" }];
+---
+
+<header class="border-b border-ink">
+  <div class="mx-auto flex w-[min(1180px,100%-32px)] flex-wrap items-center gap-x-6 gap-y-1 py-2">
+    <Wordmark href={user ? "/dashboard" : "/"} />
+    {user && (
+      <nav aria-label="Main" class="flex flex-wrap items-center gap-x-5">
+        {items.map((item) => (
+          <a
+            href={item.href}
+            aria-current={current === item.key ? "page" : undefined}
+            class:list={[
+              "inline-flex min-h-11 items-center text-[15px] font-bold text-ink no-underline",
+              current === item.key
+                ? "shadow-[inset_0_-3px_0_var(--red)]"
+                : "shadow-[inset_0_-3px_0_var(--yellow)] hover:shadow-[inset_0_-3px_0_var(--red)]",
+            ]}
+          >
+            {item.label}
+          </a>
+        ))}
+      </nav>
+    )}
+    <div class="ml-auto flex items-center gap-4">
+      {user ? (
+        <>
+          <span
+            class="hidden max-w-[22ch] truncate font-mono text-[11px] tracking-wider text-ink-mute sm:inline"
+            title={user.email}
+          >
+            {user.email}
+          </span>
+          <form method="POST" action="/api/auth/signout">
+            <button type="submit" class="btn btn-ghost btn-sm">
+              Sign out
+            </button>
+          </form>
+        </>
+      ) : (
+        <>
+          <a href="/auth/signin" class="link text-[15px]">
+            Sign in
+          </a>
+          <a href="/auth/signup" class="btn btn-sm">
+            Create account
+          </a>
+        </>
+      )}
+    </div>
+  </div>
+</header>

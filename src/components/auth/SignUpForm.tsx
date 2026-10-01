@@ -1,11 +1,11 @@
 import React, { useState } from "react";
-import { Mail, Lock, UserPlus } from "lucide-react";
 import { FormField } from "@/components/auth/FormField";
 import { PasswordToggle } from "@/components/auth/PasswordToggle";
 import { SubmitButton } from "@/components/auth/SubmitButton";
 import { ServerError } from "@/components/auth/ServerError";
 
-const MIN_PASSWORD_LENGTH = 6;
+// Keep in sync with MIN_PASSWORD_LENGTH in src/lib/auth.ts and minimum_password_length in supabase/config.toml.
+const MIN_PASSWORD_LENGTH = 8;
 
 interface Props {
   serverError?: string | null;
@@ -16,7 +16,6 @@ export default function SignUpForm({ serverError }: Props) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string }>({});
 
   function validate() {
@@ -54,16 +53,18 @@ export default function SignUpForm({ serverError }: Props) {
     }
   }
 
+  const remaining = MIN_PASSWORD_LENGTH - password.length;
   const passwordHint =
-    !errors.password && password.length > 0 && password.length < MIN_PASSWORD_LENGTH ? (
-      <p className="mt-1 text-xs text-blue-100/50">
-        {MIN_PASSWORD_LENGTH - password.length} more character
-        {MIN_PASSWORD_LENGTH - password.length !== 1 ? "s" : ""} needed
+    !errors.password && password.length > 0 && remaining > 0 ? (
+      <p className="mono-note mt-1.5" aria-live="polite">
+        {remaining} more character{remaining !== 1 ? "s" : ""} needed
       </p>
-    ) : undefined;
+    ) : (
+      <p className="mono-note mt-1.5">At least {MIN_PASSWORD_LENGTH} characters.</p>
+    );
 
   return (
-    <form method="POST" action="/api/auth/signup" className="space-y-4" onSubmit={handleSubmit} noValidate>
+    <form method="POST" action="/api/auth/signup" className="space-y-5" onSubmit={handleSubmit} noValidate>
       <FormField
         id="email"
         type="email"
@@ -73,9 +74,9 @@ export default function SignUpForm({ serverError }: Props) {
           setEmail(v);
           clearError("email");
         }}
-        placeholder="you@example.com"
+        placeholder="you@your-next-thing.com"
+        autoComplete="email"
         error={errors.email}
-        icon={<Mail className="size-4" />}
       />
 
       <FormField
@@ -87,10 +88,10 @@ export default function SignUpForm({ serverError }: Props) {
           setPassword(v);
           clearError("password");
         }}
-        placeholder="Min. 6 characters"
+        placeholder={`Min. ${MIN_PASSWORD_LENGTH} characters`}
+        autoComplete="new-password"
         error={errors.password}
         hint={passwordHint}
-        icon={<Lock className="size-4" />}
         endContent={
           <PasswordToggle
             visible={showPassword}
@@ -105,30 +106,20 @@ export default function SignUpForm({ serverError }: Props) {
         id="confirmPassword"
         name="confirmPassword"
         label="Confirm password"
-        type={showConfirmPassword ? "text" : "password"}
+        type={showPassword ? "text" : "password"}
         value={confirmPassword}
         onChange={(v) => {
           setConfirmPassword(v);
           clearError("confirmPassword");
         }}
         placeholder="Re-enter your password"
+        autoComplete="new-password"
         error={errors.confirmPassword}
-        icon={<Lock className="size-4" />}
-        endContent={
-          <PasswordToggle
-            visible={showConfirmPassword}
-            onToggle={() => {
-              setShowConfirmPassword(!showConfirmPassword);
-            }}
-          />
-        }
       />
 
       <ServerError message={serverError} />
 
-      <SubmitButton pendingText="Creating account..." icon={<UserPlus className="size-4" />}>
-        Create account
-      </SubmitButton>
+      <SubmitButton pendingText="Creating account…">Create account</SubmitButton>
     </form>
   );
 }

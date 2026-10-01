@@ -1,82 +1,74 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-@custom-variant dark (&:is(.dark *));
-
-:root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+/* ── Fonts (self-hosted latin subsets, same files as the marketing site) ───────────────────────── */
+@font-face {
+  font-family: "Archivo";
+  src: url("/fonts/archivo-latin-var.woff2") format("woff2-variations");
+  font-weight: 400 900;
+  font-stretch: 62% 125%;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono-latin-var.woff2") format("woff2-variations");
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Shantell Sans";
+  src: url("/fonts/shantell-sans-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+/* ── Brand tokens ──────────────────────────────────────────────────────────────────────────────
+   Mirrors the landing page (paper, ink, yellow = believed-but-unproven, red = struck, teal = action).
+   The shadcn variable names are mapped onto the brand so components added with `shadcn add` match. */
+:root {
+  --paper: #f5f0e6;
+  --paper-ui: #fffdf8;
+  --paper-alt: #efe9dc;
+  --ink: #191915;
+  --ink-soft: #4a4a43;
+  --ink-mute: rgb(25 25 21 / 0.68);
+  --yellow: #ffe24d;
+  --red: #e23a2e;
+  --red-text: #c62a20;
+  --teal: #0f5c5a;
+  --teal-wash: #dcebe7;
+  --rule: rgb(25 25 21 / 0.22);
+  --rule-soft: rgb(25 25 21 / 0.12);
+
+  --radius: 0rem;
+  --background: var(--paper);
+  --foreground: var(--ink);
+  --card: var(--paper-ui);
+  --card-foreground: var(--ink);
+  --popover: var(--paper-ui);
+  --popover-foreground: var(--ink);
+  --primary: var(--ink);
+  --primary-foreground: #fff;
+  --secondary: var(--paper-alt);
+  --secondary-foreground: var(--ink);
+  --muted: var(--paper-alt);
+  --muted-foreground: var(--ink-mute);
+  --accent: var(--yellow);
+  --accent-foreground: var(--ink);
+  --destructive: var(--red-text);
+  --border: var(--ink);
+  --input: var(--ink);
+  --ring: var(--teal);
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -95,30 +87,299 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-}
 
-@utility bg-cosmic {
-  background-image: linear-gradient(to bottom, #0a0e1a, #0f1529, #0a0e1a);
+  --color-paper: var(--paper);
+  --color-paper-ui: var(--paper-ui);
+  --color-paper-alt: var(--paper-alt);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-mute: var(--ink-mute);
+  --color-yellow: var(--yellow);
+  --color-red: var(--red);
+  --color-red-text: var(--red-text);
+  --color-teal: var(--teal);
+  --color-teal-wash: var(--teal-wash);
+
+  --font-sans: "Archivo", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-hand: "Shantell Sans", "Comic Sans MS", cursive;
+
+  --shadow-hard: 5px 5px 0 var(--ink);
+  --shadow-hard-sm: 3px 3px 0 var(--ink);
+  --shadow-hard-lg: 8px 8px 0 var(--ink);
+  --shadow-hard-yellow: 5px 5px 0 var(--yellow);
+  --shadow-hard-teal: 5px 5px 0 var(--teal);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-paper text-ink font-sans text-base leading-normal antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  ::selection {
+    background: var(--yellow);
+    color: var(--ink);
+  }
+  :focus-visible {
+    outline: 3px solid var(--teal);
+    outline-offset: 3px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+/* ── Brand components ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .disp {
+    font-weight: 900;
+    word-spacing: 0.06em;
+    letter-spacing: -0.038em;
+    line-height: 1;
+  }
+  .hand {
+    font-family: var(--font-hand);
+    font-weight: 600;
+  }
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .eyebrow i {
+    width: 10px;
+    height: 10px;
+    background: var(--red);
+    flex: none;
+  }
+  .slabel {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--ink);
+  }
+  .mono-note {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--ink-mute);
+  }
+
+  /* Tags: LEADING / AI DRAFT / ACTIVE … — meaning is always in the text, colour only reinforces it. */
+  .tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    padding: 4px 8px;
+    border: 1px solid var(--ink);
+    white-space: nowrap;
+    background: transparent;
+  }
+  .tag-red {
+    background: var(--red-text);
+    border-color: var(--red-text);
+    color: #fff;
+  }
+  .tag-teal {
+    background: var(--teal);
+    border-color: var(--teal);
+    color: #fff;
+  }
+  .tag-yellow {
+    background: var(--yellow);
+  }
+  .tag-open {
+    border-style: dashed;
+  }
+
+  .card {
+    background: var(--paper-ui);
+    border: 2px solid var(--ink);
+    box-shadow: var(--shadow-hard);
+  }
+  .card-flat {
+    background: var(--paper-ui);
+    border: 2px solid var(--ink);
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 10px 20px;
+    border: 2px solid var(--ink);
+    background: var(--ink);
+    color: #fff;
+    font: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    transition:
+      background-color 0.12s,
+      color 0.12s,
+      box-shadow 0.12s;
+  }
+  .btn:hover {
+    background: var(--teal);
+    border-color: var(--teal);
+  }
+  .btn:disabled,
+  .btn[aria-disabled="true"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .btn-yellow {
+    background: var(--yellow);
+    color: var(--ink);
+    box-shadow: var(--shadow-hard-sm);
+  }
+  .btn-yellow:hover {
+    background: #fff;
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--ink);
+  }
+  .btn-ghost:hover {
+    background: var(--paper-alt);
+    border-color: var(--ink);
+    color: var(--ink);
+  }
+  .btn-danger {
+    background: transparent;
+    color: var(--red-text);
+    border-color: var(--red-text);
+  }
+  .btn-danger:hover {
+    background: var(--red-text);
+    border-color: var(--red-text);
+    color: #fff;
+  }
+  .btn-sm {
+    min-height: 36px;
+    padding: 6px 14px;
+    font-size: 14px;
+  }
+
+  .link {
+    color: var(--ink);
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: inset 0 -3px 0 var(--yellow);
+  }
+  .link:hover {
+    box-shadow: inset 0 -3px 0 var(--red);
+  }
+
+  .input {
+    display: block;
+    width: 100%;
+    min-height: 44px;
+    border: 2px solid var(--ink);
+    background: var(--paper-ui);
+    padding: 10px 14px;
+    font: inherit;
+    font-size: 16px;
+    color: var(--ink);
+    border-radius: 0;
+  }
+  .input::placeholder {
+    color: rgb(25 25 21 / 0.42);
+  }
+  .input:focus {
+    outline: none;
+    box-shadow: var(--shadow-hard-yellow);
+  }
+  .input[aria-invalid="true"] {
+    border-color: var(--red-text);
+  }
+  .label {
+    display: block;
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+  }
+
+  .notice {
+    border: 2px solid var(--ink);
+    background: var(--paper-ui);
+    padding: 12px 16px;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .notice-error {
+    border-color: var(--red-text);
+    background: #fdecea;
+    color: #7a1912;
+  }
+  .notice-ok {
+    border-color: var(--teal);
+    background: var(--teal-wash);
+    color: #17352f;
+  }
+  .notice-info {
+    border-color: var(--ink);
+    background: var(--yellow);
+  }
+
+  /* Highlight + strike, as on the landing page. */
+  .mark {
+    position: relative;
+    isolation: isolate;
+    white-space: nowrap;
+  }
+  .mark::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: -0.02em;
+    right: -0.03em;
+    bottom: 0.08em;
+    height: 0.34em;
+    background: var(--yellow);
+    transform: rotate(-1.1deg);
+    transform-origin: left;
+    mix-blend-mode: multiply;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

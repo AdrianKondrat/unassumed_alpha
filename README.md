@@ -128,24 +128,20 @@ SUPABASE_URL=https://<project-ref>.supabase.co
 SUPABASE_KEY=<anon-key>
 ```
 
-### Email confirmation in local development
+### Email verification in local development
 
-By default Supabase requires email confirmation before a user can sign in. To skip this during local development:
-
-1. Open the Supabase dashboard for your project
-2. Go to **Authentication → Email → Confirm email**
-3. Toggle it **off**
-
-Users can then sign in immediately after sign-up without clicking a confirmation link.
+Email confirmation is **required** (`enable_confirmations = true` in `supabase/config.toml`). Local emails are caught by the Supabase CLI's mail server (Mailpit), at `http://127.0.0.1:54324`: open it to click the verification or password-reset link. `npm run smoke` reads the same inbox, so it needs the stack started **with** the mail server.
 
 ### Auth routes
 
-| Route                 | Description                                                             |
-| --------------------- | ----------------------------------------------------------------------- |
-| `/auth/signin`        | Email/password sign-in form                                             |
-| `/auth/signup`        | Email/password sign-up form                                             |
-| `/auth/confirm-email` | Post-signup "check your inbox" page                                     |
-| `/dashboard`          | Example protected page (redirects to `/auth/signin` if unauthenticated) |
+| Route                                           | Description                                                 |
+| ----------------------------------------------- | ----------------------------------------------------------- |
+| `/auth/signin`                                  | Email/password sign-in form                                 |
+| `/auth/signup`                                  | Email/password sign-up form                                 |
+| `/auth/confirm-email`                           | "Check your inbox" page with a resend form                  |
+| `/auth/callback`                                | Emailed-link landing: verifies the link, starts the session |
+| `/auth/forgot-password`, `/auth/reset-password` | Self-serve password recovery                                |
+| `/dashboard`                                    | Signed-in home, shows the founder's workspace               |
 
 Route protection is handled in `src/middleware.ts`. Add paths to the `PROTECTED_ROUTES` array there to require authentication.
 
@@ -196,7 +192,8 @@ Pushing to the `mvp` branch deploys the app as the Cloudflare Worker **`unassume
 
 1. **Hosted Supabase project** for the MVP. In the dashboard:
    - Authentication → URL Configuration: set _Site URL_ to the deployed Worker URL and add `<worker url>/auth/callback` to _Redirect URLs_.
-   - Authentication → Providers → Email: keep _Confirm email_ **on** (verification is required, FR-001).
+   - Authentication → Providers → Email: keep _Confirm email_ **on** (verification is required, FR-001) and set the minimum password length to 8.
+   - Authentication → Emails → Templates: paste `supabase/templates/confirmation.html` into _Confirm sign up_ and `supabase/templates/recovery.html` into _Reset password_ (subjects: "Confirm your email address" / "Reset your password"). These link straight to `/auth/callback?token_hash=…`, so verification works when the email is opened on a different browser or phone.
    - Authentication → SMTP: configure a real SMTP provider (the built-in mailer is heavily rate-limited and only sends to team members).
 2. **GitHub repository secrets** (Settings → Secrets and variables → Actions):
 

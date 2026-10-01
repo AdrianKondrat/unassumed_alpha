@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en-GB">
+  <body style="margin:0;padding:24px;background:#f5f0e6;font-family:Helvetica,Arial,sans-serif;color:#191915;">
+    <div style="max-width:520px;margin:0 auto;background:#fffdf8;border:2px solid #191915;padding:28px;">
+      <p style="margin:0 0 20px;font-size:22px;font-weight:900;letter-spacing:-0.05em;">Un<span style="font-weight:400;">assumed</span><span style="color:#c62a20;">.</span></p>
+      <h1 style="margin:0 0 12px;font-size:24px;line-height:1.2;">Confirm your email address</h1>
+      <p style="margin:0 0 24px;font-size:16px;line-height:1.5;color:#4a4a43;">
+        One click and your workspace is ready. This link works on any device and can be used once.
+      </p>
+      <p style="margin:0 0 24px;">
+        <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=email"
+           style="display:inline-block;background:#191915;color:#ffffff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 24px;">
+          Confirm email address
+        </a>
+      </p>
+      <p style="margin:0;font-size:13px;line-height:1.5;color:#4a4a43;">
+        Button not working? Paste this into your browser:<br />
+        {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&amp;type=email
+      </p>
+      <p style="margin:20px 0 0;font-size:13px;color:#4a4a43;">If you didn't create an account, you can ignore this email.</p>
+    </div>
+  </body>
+</html>
