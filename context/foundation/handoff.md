@@ -63,7 +63,7 @@ Email links use `token_hash` + custom templates (`supabase/templates/`) instead 
 
 ## Known gaps / ideas after the slices
 
-- The first real GitHub Actions run on `mvp` has not been inspected: verify the `smoke` job (Supabase CLI mail server name, `content_path` templates, `psql` step) and fix if red.
+- Real GitHub Actions on `mvp` were inspected (run 36888199585, commit 5f4ba65): `ci` and `smoke` (real Supabase CLI, SQL assertions, 30-step smoke incl. emailed links) are green; only `deploy` fails, at "Check required secrets", by design until the user adds the secrets. Check the Actions result after every push (`mcp__github__actions_list`, load via ToolSearch) and fix red `ci`/`smoke` before moving on.
 - Add a Content-Security-Policy (React islands need care), rate limiting on AI routes if abuse appears, observability (parked in the roadmap).
 - `README.md` still contains starter-era text in places; rewrite it for Unassumed once the slices land.
 - Secondary PRD success criterion (trend across rehearsals) is not in any slice; consider a small follow-up after S-06.
