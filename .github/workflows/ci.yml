@@ -25,6 +25,7 @@ jobs:
       - run: npm run test:assumptions
       - run: npm run test:rehearsal
       - run: npm run test:scorecard
+      - run: npm run test:rehearsal-resume
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -73,7 +74,7 @@ jobs:
           for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:4010/__calls && break; sleep 1; done
           # SUPABASE_URL / SUPABASE_ANON_KEY let the smoke test prove, through the real PostgREST with the
           # founder's own token, that the hidden rehearsal persona cannot be read or written by a client.
-          BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 FAKE_AI_URL=http://127.0.0.1:4010 SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY" npm run smoke
+          BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 FAKE_AI_URL=http://127.0.0.1:4010 SUPABASE_URL="$API_URL" SUPABASE_ANON_KEY="$ANON_KEY" DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm run smoke
       - if: always()
         run: supabase stop --no-backup
 

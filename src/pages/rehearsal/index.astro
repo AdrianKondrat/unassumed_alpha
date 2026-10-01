@@ -1,13 +1,19 @@
 ---
 import Layout from "@/layouts/Layout.astro";
 import { getCurrentProject } from "@/lib/services/project";
+import { expireIdleSessions } from "@/lib/services/rehearsal-service";
 import { getActiveSession, listRehearsableAssumptions, listSessions } from "@/lib/services/rehearsals";
 import { REHEARSAL_TURN_CAP } from "@/lib/services/rehearsal-persona";
 import { createClient } from "@/lib/supabase";
+import { createServiceClient } from "@/lib/supabase-admin";
 
 const supabase = createClient(Astro.request.headers, Astro.cookies);
 const project = supabase ? await getCurrentProject(supabase) : null;
 if (!supabase || !project) return Astro.redirect("/project/new");
+
+// A session idle for more than 24 h ends as "expired" before we list, so it shows as past, not as Continue.
+const admin = createServiceClient();
+if (admin) await expireIdleSessions(admin, project.id);
 
 const [active, assumptions, sessions] = await Promise.all([
   getActiveSession(supabase, project.id),
@@ -27,7 +33,11 @@ const START_ERRORS: Record<string, string | undefined> = {
 };
 const startError = START_ERRORS[Astro.url.searchParams.get("startError") ?? ""];
 
-const ENDED_LABEL = { cap: "Ended at the question limit", user: "Ended early" } as const;
+const ENDED_LABEL = {
+  cap: "Ended at the question limit",
+  user: "Ended early",
+  expired: "Expired after 24 hours idle",
+} as const;
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 ---

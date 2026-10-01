@@ -32,11 +32,11 @@ union all select s2, project_a, asm_a, 'ended', 'user', now() from ids
 union all select sb, project_b, asm_b, 'ended', 'cap', now() from ids;
 insert into public.rehearsal_sessions (id, project_id, assumption_id) select s3, project_a, asm_a from ids;
 
-insert into public.rehearsal_turns (session_id, seq, question, reply, replied_at)
-select s1, 1, 'Don''t you think gardeners hate their tools?', 'Not really.', now() from ids
-union all select s1, 2, E'Line one\nLine two with validated in it', 'Maybe.', now() from ids
-union all select s1, 3, 'Tell me about the last time you bought a trowel.', null, null from ids
-union all select sb, 1, 'B question', 'B reply', now() from ids;
+insert into public.rehearsal_turns (session_id, client_key, seq, question, reply, replied_at)
+select s1, gen_random_uuid(), 1, 'Don''t you think gardeners hate their tools?', 'Not really.', now() from ids
+union all select s1, gen_random_uuid(), 2, E'Line one\nLine two with validated in it', 'Maybe.', now() from ids
+union all select s1, gen_random_uuid(), 3, 'Tell me about the last time you bought a trowel.', null, null from ids
+union all select sb, gen_random_uuid(), 1, 'B question', 'B reply', now() from ids;
 
 -- ---- Table constraints (as the owner) ---------------------------------------------------------------------
 do $$

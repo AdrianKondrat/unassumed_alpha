@@ -10,11 +10,17 @@
 // Optional: set SUPABASE_URL and SUPABASE_ANON_KEY to also prove, through the real PostgREST with the founder's
 // own session token, that the hidden rehearsal persona cannot be read or written by a client.
 
+import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:4321";
 const MAIL_URL = process.env.MAIL_URL ?? "http://127.0.0.1:54324";
 const FAKE_AI_URL = process.env.FAKE_AI_URL ?? "";
 const SUPABASE_URL = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? "";
+// Optional: a Postgres URL (the local Supabase DB). Lets the resume steps age a session or a reply lease, which
+// no client can do; those steps are skipped without it.
+const DATABASE_URL = process.env.DATABASE_URL ?? "";
 const email = `smoke-${Date.now()}@example.com`;
 const password = "Smoke-Test-Passw0rd!";
 const newPassword = "Smoke-Test-New-Passw0rd!";
@@ -181,7 +187,24 @@ async function pageOf(path) {
   return { ...result, text: result.text.replaceAll("<!-- -->", "") };
 }
 const sessionApi = (id, action) => `/api/rehearsal/sessions/${id}/${action}`;
-const ask = (id, question) => api(sessionApi(id, "turns"), { json: { question } });
+const stateApi = (id) => `/api/rehearsal/sessions/${id}`;
+const ask = (id, question, clientKey = randomUUID()) => api(sessionApi(id, "turns"), { json: { question, clientKey } });
+/** A GET JSON route (the resume state), collected into `corpus` like every other body. */
+async function getJson(path) {
+  const response = await fetch(BASE_URL + path, { headers: { Cookie: cookieHeader() }, redirect: "manual" });
+  storeCookies(response);
+  const text = note(await response.text());
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // not JSON: leave data null
+  }
+  return { status: response.status, data, text };
+}
+/** Runs one statement against the local database and returns its single value (trimmed). */
+const db = (sql) =>
+  execFileSync("psql", [DATABASE_URL, "-v", "ON_ERROR_STOP=1", "-qAt", "-c", sql], { encoding: "utf8" }).trim();
 const startRehearsal = (assumptionId) => request("/api/rehearsal/sessions", { method: "POST", form: { assumptionId } });
 const sessionIdFrom = (location) => /^\/rehearsal\/([0-9a-f-]{36})$/.exec(location)?.[1] ?? "";
 const switchJar = (saved) => {
@@ -194,6 +217,8 @@ let sessionOne = "";
 let sessionTwo = "";
 let zeroSession = "";
 let sessionThree = "";
+let sessionFour = "";
+let sessionFive = "";
 /** Page text with entities decoded and runs of whitespace collapsed, so assertions ignore markup wrapping and escaping. */
 const flat = (text) =>
   text
@@ -245,6 +270,15 @@ const steps = [
     "rehearsal session page redirects anonymous user",
     () => request(`/rehearsal/${NIL_ID}`),
     { status: 302, location: "/auth/signin" },
+  ],
+  [
+    "the resume state route answers 401 to anonymous callers",
+    async () => {
+      const r = await getJson(stateApi(NIL_ID));
+      check(r.status === 401, `state: expected 401, saw ${r.status}`);
+      return { status: 200, location: "" };
+    },
+    { status: 200 },
   ],
   [
     "scorecard page redirects anonymous user",
@@ -1103,8 +1137,9 @@ const steps = [
             const start = await startRehearsal(rehearsable[1]);
             sessionTwo = sessionIdFrom(start.location);
             check(sessionTwo !== "" && sessionTwo !== sessionOne, `second session: ${start.location}`);
+            const key8 = randomUUID();
             for (let n = 1; n <= 8; n++) {
-              const r = await ask(sessionTwo, `Question number ${n}`);
+              const r = await ask(sessionTwo, `Question number ${n}`, n === 8 ? key8 : undefined);
               check(r.status === 200 && r.data.turn.seq === n, `turn ${n}: ${r.status}`);
               check(r.data.ended === (n === 8), `turn ${n}: ended=${r.data.ended}`);
             }
@@ -1115,6 +1150,13 @@ const steps = [
               `ninth: ${ninth.status} ${ninth.data?.error}`,
             );
             check((await aiCalls()).length === callsBefore, "the ninth question reached the AI");
+            // A lost response to the 8th question: the same key still resolves after the cap ended the session.
+            const replay8 = await ask(sessionTwo, "Question number 8", key8);
+            check(
+              replay8.status === 200 && replay8.data.turn.seq === 8 && replay8.data.ended === true,
+              `replay of the 8th: ${replay8.status} ${replay8.text.slice(0, 80)}`,
+            );
+            check((await aiCalls()).length === callsBefore, "replaying the 8th question reached the AI");
             const page = await pageOf(`/rehearsal/${sessionTwo}`);
             check(
               page.text.includes("Questions used: 8 of 8") && page.text.includes("You used all your questions"),
@@ -1140,7 +1182,7 @@ const steps = [
             const bad = await api(sessionApi("not-a-uuid", "turns"), { json: { question: "hi" } });
             check(bad.status === 404, `malformed id: ${bad.status}`);
             const ghost = await api(sessionApi("33333333-3333-3333-3333-333333333333", "turns"), {
-              json: { question: "hi" },
+              json: { question: "hi", clientKey: randomUUID() },
             });
             check(ghost.status === 404 && ghost.data.error === "not_found", `unknown id: ${ghost.status}`);
             const end = await api(sessionApi("33333333-3333-3333-3333-333333333333", "end"));
@@ -1373,6 +1415,317 @@ const steps = [
           { status: 200 },
         ],
         [
+          "a repeated send with the same key returns the saved turn: one turn, one reply, no second AI call",
+          async () => {
+            const start = await startRehearsal(rehearsable[0]);
+            sessionFour = sessionIdFrom(start.location);
+            check(sessionFour !== "", `start: ${start.location}`);
+            const key = randomUUID();
+            const first = await ask(sessionFour, "What did you do the last time a tool hurt your wrist?", key);
+            check(first.status === 200 && first.data.turn.seq === 1, `first send: ${first.status}`);
+            callsBefore = (await aiCalls()).length;
+            const again = await ask(sessionFour, "What did you do the last time a tool hurt your wrist?", key);
+            check(again.status === 200 && again.data.turn.seq === 1, `repeat: ${again.status}`);
+            check(again.data.turn.reply === first.data.turn.reply, "the repeat returned a different reply");
+            check(again.data.pending === undefined, "an answered repeat was reported as pending");
+            const reworded = await ask(sessionFour, "Totally different words", key);
+            check(
+              reworded.status === 200 && reworded.data.turn.question.startsWith("What did you do the last time"),
+              "a replay rewrote the saved question",
+            );
+            check((await aiCalls()).length === callsBefore, "a repeated send reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionFour}`);
+            check(page.text.includes("Questions used: 1 of 8"), "the repeat used another question");
+            check(countOf(page.text, "You · question") === 1, "the repeat added a turn");
+            // The key is required, and must be a UUID.
+            const missing = await api(sessionApi(sessionFour, "turns"), { json: { question: "No key" } });
+            check(missing.status === 400, `missing key: ${missing.status}`);
+            const junk = await api(sessionApi(sessionFour, "turns"), {
+              json: { question: "Bad key", clientKey: "abc" },
+            });
+            check(junk.status === 400, `junk key: ${junk.status}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the resume state route returns only the allow-listed fields and costs no AI call",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            const state = await getJson(stateApi(sessionFour));
+            check(state.status === 200, `state: ${state.status}`);
+            check(
+              Object.keys(state.data).sort().join() === "endedReason,pending,status,turns",
+              `state keys: ${Object.keys(state.data).join()}`,
+            );
+            check(state.data.status === "active" && state.data.pending === null, "state wrong");
+            check(state.data.turns.length === 1 && state.data.turns[0].reply?.startsWith("Answer 1:"), "turns wrong");
+            check(
+              Object.keys(state.data.turns[0]).sort().join() === "clientKey,question,reply,seq",
+              `turn keys: ${Object.keys(state.data.turns[0]).join()}`,
+            );
+            check(
+              !/reply_started_at|last_activity_at|scenario|hidden_truths/.test(state.text),
+              "the state leaked a column",
+            );
+            check((await aiCalls()).length === callsBefore, "reading the state reached the AI");
+            const ghost = await getJson(stateApi(NIL_ID));
+            check(ghost.status === 404, `unknown session: ${ghost.status}`);
+            const bad = await getJson(stateApi("not-a-uuid"));
+            check(bad.status === 404, `malformed id: ${bad.status}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "while a reply is generated elsewhere a repeat or retry waits, a new key is refused, and one reply is made",
+          async () => {
+            await fetch(`${FAKE_AI_URL}/__mode?set=slow&ms=2500`);
+            callsBefore = (await aiCalls()).length;
+            const key = randomUUID();
+            const original = ask(sessionFour, "Second question: why that brand?", key);
+            await sleep(700);
+            const state = await getJson(stateApi(sessionFour));
+            check(state.data.pending === "in_flight", `pending: ${state.data.pending}`);
+            check(state.data.turns.length === 2 && state.data.turns[1].reply === null, "the saved turn is missing");
+            const replay = await ask(sessionFour, "Second question: why that brand?", key);
+            check(
+              replay.status === 200 && replay.data.pending === true,
+              `replay: ${replay.status} ${replay.text.slice(0, 80)}`,
+            );
+            check(replay.data.turn.seq === 2 && replay.data.turn.reply === null, "the replay was not shown as waiting");
+            const other = await ask(sessionFour, "A different question meanwhile");
+            check(other.status === 409 && other.data.error === "reply_pending", `new key: ${other.status}`);
+            const retry = await api(sessionApi(sessionFour, "retry"));
+            check(
+              retry.status === 200 && retry.data.pending === true,
+              `retry: ${retry.status} ${retry.text.slice(0, 80)}`,
+            );
+            const done = await original;
+            check(done.status === 200 && done.data.turn.reply?.startsWith("Answer 2:"), `original: ${done.status}`);
+            await fake("/__mode?set=ok");
+            const persona = (await aiCalls()).slice(callsBefore).filter((c) => c.task === "persona");
+            check(persona.length === 1, `expected one reply generation, saw ${persona.length}`);
+            const after = await getJson(stateApi(sessionFour));
+            check(after.data.pending === null && after.data.turns.length === 2, "state after the reply is wrong");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "an abandoned reply is resumed by repeating the same key: no new turn, one reply, stale lease only",
+          async () => {
+            if (!DATABASE_URL) return { status: 200, location: "(skipped: set DATABASE_URL)" };
+            await fake("/__mode?set=http500");
+            const key = randomUUID();
+            const failed = await ask(sessionFour, "Third question: where did you buy it?", key);
+            check(failed.status === 502 && failed.data.turn?.seq === 3, `failed send: ${failed.status}`);
+            await fake("/__mode?set=ok");
+            let state = await getJson(stateApi(sessionFour));
+            check(state.data.pending === "needs_reply", `after a failure: ${state.data.pending}`);
+
+            // A request that is still alive holds a fresh lease: nobody else may start a second generation.
+            db(
+              `update public.rehearsal_turns set reply_started_at = clock_timestamp() where session_id = '${sessionFour}' and seq = 3`,
+            );
+            state = await getJson(stateApi(sessionFour));
+            check(state.data.pending === "in_flight", `fresh lease: ${state.data.pending}`);
+            callsBefore = (await aiCalls()).length;
+            const waiting = await ask(sessionFour, "Third question: where did you buy it?", key);
+            check(waiting.status === 200 && waiting.data.pending === true, `replay on a live lease: ${waiting.status}`);
+            const retry = await api(sessionApi(sessionFour, "retry"));
+            check(retry.status === 200 && retry.data.pending === true, `retry on a live lease: ${retry.status}`);
+            check((await aiCalls()).length === callsBefore, "a live lease did not stop a second generation");
+
+            // The request died: once the lease is stale the same key resumes it.
+            db(
+              `update public.rehearsal_turns set reply_started_at = clock_timestamp() - interval '31 seconds' where session_id = '${sessionFour}' and seq = 3`,
+            );
+            state = await getJson(stateApi(sessionFour));
+            check(state.data.pending === "needs_reply", `stale lease: ${state.data.pending}`);
+            const resumed = await ask(sessionFour, "Third question: where did you buy it?", key);
+            check(resumed.status === 200 && resumed.data.turn.seq === 3, `resume: ${resumed.status}`);
+            check(
+              resumed.data.turn.reply?.startsWith("Answer 3:") && resumed.data.pending === undefined,
+              "no reply after resuming",
+            );
+            const persona = (await aiCalls()).slice(callsBefore).filter((c) => c.task === "persona");
+            check(persona.length === 1, `expected one reply generation, saw ${persona.length}`);
+            check(
+              db(`select count(*) from public.rehearsal_turns where session_id = '${sessionFour}'`) === "3",
+              "resuming added a turn",
+            );
+            check(
+              db(
+                `select reply_started_at is null from public.rehearsal_turns where session_id = '${sessionFour}' and seq = 3`,
+              ) === "t",
+              "the lease was not cleared",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a failed reply gives its lease back, so Retry works at once",
+          async () => {
+            await fake("/__mode?set=http500");
+            const failed = await ask(sessionFour, "Fourth question: how often?");
+            check(failed.status === 502 && failed.data.turn?.seq === 4, `failed send: ${failed.status}`);
+            await fake("/__mode?set=ok");
+            const retry = await api(sessionApi(sessionFour, "retry"));
+            check(
+              retry.status === 200 && retry.data.turn.reply?.startsWith("Answer 4:"),
+              `immediate retry: ${retry.status}`,
+            );
+            check(retry.data.pending === undefined, "retry was held back by a lease the failure should have released");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "three parallel sends with one key make one turn and one reply",
+          async () => {
+            const start = await startRehearsal(rehearsable[1]);
+            check(start.location === `/rehearsal/${sessionFour}`, "one active session per project was not joined");
+            const end = await api(sessionApi(sessionFour, "end"));
+            check(end.status === 200, `end: ${end.status}`);
+            const second = await startRehearsal(rehearsable[1]);
+            sessionFive = sessionIdFrom(second.location);
+            check(sessionFive !== "" && sessionFive !== sessionFour, `new session: ${second.location}`);
+            await fetch(`${FAKE_AI_URL}/__mode?set=slow&ms=1200`);
+            callsBefore = (await aiCalls()).length;
+            const key = randomUUID();
+            const results = await Promise.all([1, 2, 3].map(() => ask(sessionFive, "Parallel question", key)));
+            await fake("/__mode?set=ok");
+            check(
+              results.every((r) => r.status === 200 && r.data.turn.seq === 1),
+              `statuses: ${results.map((r) => r.status)}`,
+            );
+            check(
+              results.filter((r) => r.data.pending === undefined).length === 1,
+              "more than one request produced the reply",
+            );
+            const persona = (await aiCalls()).slice(callsBefore).filter((c) => c.task === "persona");
+            check(persona.length === 1, `expected one reply generation, saw ${persona.length}`);
+            const page = await pageOf(`/rehearsal/${sessionFive}`);
+            check(
+              page.text.includes("Questions used: 1 of 8") && countOf(page.text, "You · question") === 1,
+              "the parallel sends added turns",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "polling and reading never count as activity",
+          async () => {
+            if (!DATABASE_URL) return { status: 200, location: "(skipped: set DATABASE_URL)" };
+            db(
+              `update public.rehearsal_sessions set last_activity_at = now() - interval '3 hours' where id = '${sessionFive}'`,
+            );
+            const before = db(`select last_activity_at from public.rehearsal_sessions where id = '${sessionFive}'`);
+            for (let i = 0; i < 3; i++) await getJson(stateApi(sessionFive));
+            await pageOf(`/rehearsal/${sessionFive}`);
+            await pageOf("/rehearsal");
+            check(
+              db(`select last_activity_at from public.rehearsal_sessions where id = '${sessionFive}'`) === before,
+              "a read moved last_activity_at",
+            );
+            // A question is activity.
+            const r = await ask(sessionFive, "Second parallel-session question");
+            check(r.status === 200, `ask: ${r.status}`);
+            check(
+              db(
+                `select last_activity_at > now() - interval '1 minute' from public.rehearsal_sessions where id = '${sessionFive}'`,
+              ) === "t",
+              "a question did not move last_activity_at",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "after 24 hours idle a session expires: read-only transcript, replay still works, a new session can start, it can be scored",
+          async () => {
+            if (!DATABASE_URL) return { status: 200, location: "(skipped: set DATABASE_URL)" };
+            const key = randomUUID();
+            const keyed = await ask(sessionFive, "A keyed question before expiry", key);
+            check(keyed.status === 200 && keyed.data.turn.seq === 3, `keyed: ${keyed.status}`);
+            db(
+              `update public.rehearsal_sessions set last_activity_at = now() - interval '25 hours' where id = '${sessionFive}'`,
+            );
+
+            // 24 h 1 m idle: a read applies the expiry.
+            const state = await getJson(stateApi(sessionFive));
+            check(
+              state.data.status === "ended" && state.data.endedReason === "expired",
+              `state: ${state.data.status}/${state.data.endedReason}`,
+            );
+            check(state.data.turns.length === 3, "expiry lost a turn");
+            callsBefore = (await aiCalls()).length;
+            const late = await ask(sessionFive, "A question after expiry");
+            check(late.status === 409 && late.data.error === "not_active", `late question: ${late.status}`);
+            const retry = await api(sessionApi(sessionFive, "retry"));
+            check(retry.status === 409, `late retry: ${retry.status}`);
+            const replay = await ask(sessionFive, "A keyed question before expiry", key);
+            check(replay.status === 200 && replay.data.turn.seq === 3, `replay after expiry: ${replay.status}`);
+            check((await aiCalls()).length === callsBefore, "an expired session reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionFive}`);
+            check(page.text.includes("expired after 24 hours of inactivity"), "expired copy missing");
+            check(!page.text.includes('id="question"'), "an expired session still offers the question box");
+            check(page.text.includes("Questions used: 3 of 8"), "the transcript changed");
+            const list = await pageOf("/rehearsal");
+            check(list.text.includes("Expired after 24 hours idle"), "the expired session is not listed as expired");
+            check(!list.text.includes("Session in progress"), "an expired session still blocks the list");
+
+            // Still scorable: expired sessions are ended sessions.
+            const score = await api(sessionApi(sessionFive, "score"));
+            check(score.status === 200 && score.data.status === "ready", `score: ${JSON.stringify(score.data)}`);
+            const [call] = (await aiCalls()).slice(callsBefore);
+            check(call.task === "score" && call.turnsSent === 3, "the expired transcript was not scored in full");
+
+            // The slot is free: a new session starts.
+            const next = await startRehearsal(rehearsable[1]);
+            const nextId = sessionIdFrom(next.location);
+            check(nextId !== "" && nextId !== sessionFive, `new session after expiry: ${next.location}`);
+            check((await api(sessionApi(nextId, "end"))).status === 200, "ending the new session failed");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "starting a session ends a stale one first, and the list page frees it without opening it",
+          async () => {
+            if (!DATABASE_URL) return { status: 200, location: "(skipped: set DATABASE_URL)" };
+            const one = await startRehearsal(rehearsable[2]);
+            const stale = sessionIdFrom(one.location);
+            check(stale !== "", `start: ${one.location}`);
+            db(
+              `update public.rehearsal_sessions set last_activity_at = now() - interval '30 hours' where id = '${stale}'`,
+            );
+            const two = await startRehearsal(rehearsable[2]);
+            const fresh = sessionIdFrom(two.location);
+            check(fresh !== "" && fresh !== stale, `a stale session blocked a new start: ${two.location}`);
+            check(
+              db(`select status || '/' || ended_reason from public.rehearsal_sessions where id = '${stale}'`) ===
+                "ended/expired",
+              "the stale session was not ended as expired",
+            );
+            db(
+              `update public.rehearsal_sessions set last_activity_at = now() - interval '30 hours' where id = '${fresh}'`,
+            );
+            const list = await pageOf("/rehearsal");
+            check(!list.text.includes("Session in progress"), "the list still offers Continue for a stale session");
+            check(
+              db(`select status || '/' || ended_reason from public.rehearsal_sessions where id = '${fresh}'`) ===
+                "ended/expired",
+              "the list did not expire the stale session",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
           "through the real database API a founder cannot read or write the hidden persona",
           async () => {
             if (!SUPABASE_URL || !SUPABASE_ANON_KEY)
@@ -1461,6 +1814,31 @@ const steps = [
               }),
             });
             check([401, 403].includes(forgedFlag.status), `a flag was forged: ${forgedFlag.status}`);
+            // Resume primitives: the lease, the key and the activity clock are the server's alone.
+            for (const [column, value] of [
+              ["reply_started_at", null],
+              ["client_key", NIL_ID],
+            ]) {
+              const edit = await rest(`rehearsal_turns?session_id=eq.${sessionFive}`, {
+                method: "PATCH",
+                body: JSON.stringify({ [column]: value }),
+              });
+              check([401, 403].includes(edit.status), `${column} was writable: ${edit.status}`);
+            }
+            const touch = await rest(`rehearsal_sessions?id=eq.${sessionFive}`, {
+              method: "PATCH",
+              body: JSON.stringify({ last_activity_at: new Date().toISOString() }),
+            });
+            check([401, 403].includes(touch.status), `last_activity_at was writable: ${touch.status}`);
+            for (const [fn, args] of [
+              ["rehearsal_claim_reply", { p_session: sessionFive, p_seq: 1 }],
+              ["rehearsal_release_reply", { p_session: sessionFive, p_seq: 1 }],
+              ["rehearsal_expire_idle", { p_project: NIL_ID }],
+              ["rehearsal_add_turn", { p_session: sessionFive, p_question: "forged", p_client_key: NIL_ID }],
+            ]) {
+              const r = await rest(`rpc/${fn}`, { method: "POST", body: JSON.stringify(args) });
+              check([401, 403, 404].includes(r.status), `${fn} was callable: ${r.status}`);
+            }
             const claim = await rest("rpc/claim_scorecard", {
               method: "POST",
               body: JSON.stringify({ p_session: sessionOne }),
@@ -1505,9 +1883,14 @@ const steps = [
               const card = await request(`/rehearsal/${sessionTwo}/scorecard`);
               check(card.status === 302 && card.location === "/rehearsal", `scorecard page: ${card.status}`);
               check(!card.text.includes("Question number"), "the scorecard page leaked a transcript");
+              const foreignState = await getJson(stateApi(sessionTwo));
+              check(foreignState.status === 404, `state: ${foreignState.status}`);
+              check(!foreignState.text.includes("Question number"), "the state route leaked a transcript");
               callsBefore = (await aiCalls()).length;
               for (const action of ["turns", "retry", "end", "score"]) {
-                const r = await api(sessionApi(sessionTwo, action), { json: { question: "intrusion" } });
+                const r = await api(sessionApi(sessionTwo, action), {
+                  json: { question: "intrusion", clientKey: randomUUID() },
+                });
                 check(r.status === 404 && r.data?.error === "not_found", `${action}: ${r.status}`);
                 check(
                   !r.text.includes("Question number") && !r.text.includes("Answer "),

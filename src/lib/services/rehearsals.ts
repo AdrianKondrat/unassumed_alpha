@@ -4,7 +4,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { RehearsalSession, RehearsalTurn } from "@/types";
 
-const SESSION_COLUMNS = "id, project_id, assumption_id, status, ended_reason, created_at, ended_at";
+const SESSION_COLUMNS = "id, project_id, assumption_id, status, ended_reason, created_at, ended_at, last_activity_at";
 
 export async function getSession(supabase: SupabaseClient, id: string): Promise<RehearsalSession | null> {
   const { data, error } = await supabase
@@ -47,6 +47,34 @@ export async function listTurns(supabase: SupabaseClient, sessionId: string): Pr
     // eslint-disable-next-line no-console
     console.error("listTurns failed", error.code);
     return [];
+  }
+  return data;
+}
+
+/** A turn as the resume state needs it. `reply_started_at` and `client_key` are classified or allow-listed before leaving. */
+export interface StateTurn {
+  seq: number;
+  question: string;
+  reply: string | null;
+  client_key: string;
+  reply_started_at: string | null;
+}
+
+/**
+ * Every saved turn in order, with the lease and key needed to classify and resume the latest one. A failed read is
+ * `null`, never an empty list: a client that applied "no turns" would wipe the transcript the founder is looking at.
+ */
+export async function listTurnsForState(supabase: SupabaseClient, sessionId: string): Promise<StateTurn[] | null> {
+  const { data, error } = await supabase
+    .from("rehearsal_turns")
+    .select("seq, question, reply, client_key, reply_started_at")
+    .eq("session_id", sessionId)
+    .order("seq", { ascending: true })
+    .overrideTypes<StateTurn[], { merge: false }>();
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("listTurnsForState failed", error.code);
+    return null;
   }
   return data;
 }

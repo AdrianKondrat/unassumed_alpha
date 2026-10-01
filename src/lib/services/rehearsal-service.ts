@@ -11,8 +11,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { complete } from "@/lib/ai";
 import type { AIErrorKind } from "@/lib/ai-request";
-import type { RehearsalTurn } from "@/types";
+import type { RehearsalSession, RehearsalTurn } from "@/types";
 import {
+  REHEARSAL_TURN_CAP,
   ScenarioSchema,
   buildPersonaMessages,
   buildScenarioMessages,
@@ -20,7 +21,10 @@ import {
   parseScenario,
 } from "./rehearsal-persona";
 import type { PriorTurn } from "./rehearsal-persona";
-import { getActiveSession, getSession } from "./rehearsals";
+import { classifyTurn, isSessionExpired, resolveReplay } from "./rehearsal-resume";
+import type { PendingState } from "./rehearsal-resume";
+import { getActiveSession, getSession, listTurnsForState } from "./rehearsals";
+import type { StateTurn } from "./rehearsals";
 
 /** Scenario generation is a one-off, founder-initiated wait with a visible pending state; allow it longer than a reply. */
 const SCENARIO_TIMEOUT_MS = 20_000;
@@ -69,6 +73,8 @@ export async function startSession(params: {
     return startFailure("assumption_inactive", "Only an assumption you are keeping active can be rehearsed.");
   }
 
+  // A session idle for more than 24 h is ended first, so a stale one never blocks a new start.
+  await expireIdleSessions(admin, assumption.project_id);
   const current = await getActiveSession(supabase, assumption.project_id);
   if (current) return { ok: true, sessionId: current.id, existing: true };
 
@@ -121,6 +127,37 @@ export async function startSession(params: {
 }
 
 // ---------------------------------------------------------------------------------------------
+// Idle expiry
+// ---------------------------------------------------------------------------------------------
+/** Ends the project's active session if it has been idle for more than 24 h. Safe to call on every start and list. */
+export async function expireIdleSessions(admin: SupabaseClient, projectId: string): Promise<void> {
+  const { error } = await admin.rpc("rehearsal_expire_idle", { p_project: projectId });
+  // eslint-disable-next-line no-console
+  if (error) console.error("rehearsal_expire_idle failed", error.code);
+}
+
+/**
+ * The founder's session with idle expiry applied. The database decides expiry with its own clock; the app-side
+ * check only avoids calling it for sessions that cannot be stale. A session that is not the founder's is null.
+ */
+async function loadSession(
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+  sessionId: string,
+): Promise<RehearsalSession | null> {
+  const session = await getSession(supabase, sessionId);
+  if (!session) return null;
+  const idle = isSessionExpired({
+    status: session.status,
+    lastActivityAt: session.last_activity_at,
+    now: Date.now(),
+  });
+  if (!idle) return session;
+  await expireIdleSessions(admin, session.project_id);
+  return (await getSession(supabase, sessionId)) ?? session;
+}
+
+// ---------------------------------------------------------------------------------------------
 // Replies (shared by send and retry)
 // ---------------------------------------------------------------------------------------------
 export type TurnErrorCode =
@@ -134,7 +171,8 @@ export type TurnErrorCode =
   | "server_error";
 
 export type TurnResult =
-  | { ok: true; turn: RehearsalTurn; ended: boolean }
+  /** `pending` means another request is still generating this turn's reply: show it as waiting and poll. */
+  | { ok: true; turn: RehearsalTurn; ended: boolean; pending?: boolean }
   /** `turn` is present when the question was saved but no reply could be produced (the UI shows Retry). */
   | { ok: false; code: TurnErrorCode; message: string; turn?: RehearsalTurn };
 
@@ -154,10 +192,16 @@ const turnFailure = (code: TurnErrorCode, message: string, turn?: RehearsalTurn)
 });
 
 // What the service-only database functions return, validated rather than trusted.
-const AddTurnSchema = z.object({ ok: z.boolean(), seq: z.number().int().optional(), code: z.string().optional() });
+const AddTurnSchema = z.object({
+  ok: z.boolean(),
+  seq: z.number().int().optional(),
+  replay: z.boolean().optional(),
+  code: z.string().optional(),
+});
 const StoreReplySchema = z.object({ ok: z.boolean(), stored: z.boolean().optional(), ended: z.boolean().optional() });
+const ClaimSchema = z.enum(["claimed", "answered", "in_flight", "not_found"]);
 
-/** Produces and stores the persona's reply to one saved question. The question is never lost on failure. */
+/** Produces and stores the persona's reply to one claimed turn. The question is never lost on failure. */
 async function generateReply(params: {
   supabase: SupabaseClient;
   admin: SupabaseClient;
@@ -229,7 +273,7 @@ async function generateReply(params: {
   }
 
   if (stored.data.stored === false) {
-    // A parallel retry stored its reply first; show that one so the transcript stays consistent.
+    // A parallel request stored its reply first; show that one so the transcript stays consistent.
     const winner = await supabase
       .from("rehearsal_turns")
       .select("reply")
@@ -245,21 +289,90 @@ async function generateReply(params: {
   return { ok: true, turn: { seq, question, reply: guarded.text }, ended: stored.data.ended === true };
 }
 
-/** Saves the founder's next question (before any AI call), then gets the persona's reply. */
+/**
+ * Takes the reply lease for one saved turn and generates its reply, or reports what the other holder is doing.
+ * On any failure the lease is handed back, so Retry works immediately instead of after the lease runs out. On
+ * success the database clears it together with storing the reply.
+ */
+async function resumeTurn(params: {
+  supabase: SupabaseClient;
+  admin: SupabaseClient;
+  founderId: string;
+  sessionId: string;
+  turn: RehearsalTurn;
+}): Promise<TurnResult> {
+  const { supabase, admin, sessionId, turn } = params;
+
+  const claimCall = await admin.rpc("rehearsal_claim_reply", { p_session: sessionId, p_seq: turn.seq });
+  const claim = ClaimSchema.safeParse(claimCall.data);
+  if (claimCall.error || !claim.success) {
+    // eslint-disable-next-line no-console
+    console.error("rehearsal_claim_reply failed", claimCall.error?.code ?? "unexpected result");
+    return turnFailure("server_error", SERVER_ERROR_COPY, turn);
+  }
+  switch (claim.data) {
+    case "in_flight":
+      return { ok: true, turn, ended: false, pending: true };
+    case "not_found":
+      return turnFailure("server_error", SERVER_ERROR_COPY, turn);
+    case "answered": {
+      // Another request finished it between our read and our claim: hand back what it stored.
+      const fresh = await supabase
+        .from("rehearsal_turns")
+        .select("seq, question, reply")
+        .eq("session_id", sessionId)
+        .eq("seq", turn.seq)
+        .maybeSingle<RehearsalTurn>();
+      if (fresh.error || !fresh.data) return turnFailure("server_error", SERVER_ERROR_COPY, turn);
+      return { ok: true, turn: fresh.data, ended: await endedAtCap(supabase, sessionId, turn.seq) };
+    }
+    case "claimed":
+      break;
+  }
+
+  const result = await generateReply({ ...params, seq: turn.seq, question: turn.question });
+  if (!result.ok) {
+    const released = await admin.rpc("rehearsal_release_reply", { p_session: sessionId, p_seq: turn.seq });
+    // eslint-disable-next-line no-console
+    if (released.error) console.error("rehearsal_release_reply failed", released.error.code);
+  }
+  return result;
+}
+
+/** True when the 8th reply landed and ended the session at the cap (so the client can show the ended state). */
+async function endedAtCap(supabase: SupabaseClient, sessionId: string, seq: number): Promise<boolean> {
+  if (seq < REHEARSAL_TURN_CAP) return false;
+  const session = await getSession(supabase, sessionId);
+  return session?.status === "ended" && session.ended_reason === "cap";
+}
+
+/**
+ * Saves the founder's next question (before any AI call), then gets the persona's reply. `clientKey` makes the
+ * send idempotent: the same key again (a lost response, a double click, a refresh) returns the saved turn
+ * instead of adding another, waits if its reply is being generated elsewhere, and resumes the generation if
+ * the request that was producing it is gone.
+ */
 export async function sendTurn(params: {
   supabase: SupabaseClient;
   admin: SupabaseClient;
   founderId: string;
   sessionId: string;
   question: string;
+  clientKey: string;
 }): Promise<TurnResult> {
-  const { supabase, admin, founderId, sessionId, question } = params;
+  const { supabase, admin, founderId, sessionId, question, clientKey } = params;
 
+  // Ownership first: a session the founder cannot see is simply not found. Status is NOT checked here: a replayed
+  // key must still resolve after the session ended (a lost response to the 8th question), and the database
+  // decides everything else (expiry, cap, pending) under its row lock.
   const session = await getSession(supabase, sessionId);
   if (!session) return turnFailure("not_found", TURN_COPY.not_found);
-  if (session.status !== "active") return turnFailure("not_active", TURN_COPY.not_active);
 
-  const addCall = await admin.rpc("rehearsal_add_turn", { p_session: sessionId, p_question: question });
+  const addCall = await admin.rpc("rehearsal_add_turn", {
+    p_session: sessionId,
+    p_question: question,
+    p_client_key: clientKey,
+  });
   if (addCall.error) {
     // eslint-disable-next-line no-console
     console.error("rehearsal_add_turn failed", addCall.error.code);
@@ -275,7 +388,26 @@ export async function sendTurn(params: {
     return turnFailure("server_error", SERVER_ERROR_COPY);
   }
 
-  return generateReply({ supabase, admin, founderId, sessionId, seq: outcome.data.seq, question });
+  // The saved turn is the truth (on a replay it may differ from the text just sent).
+  const saved = await supabase
+    .from("rehearsal_turns")
+    .select("seq, question, reply, reply_started_at")
+    .eq("session_id", sessionId)
+    .eq("seq", outcome.data.seq)
+    .maybeSingle<RehearsalTurn & { reply_started_at: string | null }>();
+  if (saved.error || !saved.data) return turnFailure("server_error", SERVER_ERROR_COPY);
+  const turn: RehearsalTurn = { seq: saved.data.seq, question: saved.data.question, reply: saved.data.reply };
+
+  if (outcome.data.replay === true) {
+    const next = resolveReplay({
+      reply: turn.reply,
+      replyStartedAt: saved.data.reply_started_at,
+      now: Date.now(),
+    });
+    if (next === "answered") return { ok: true, turn, ended: await endedAtCap(supabase, sessionId, turn.seq) };
+    if (next === "wait") return { ok: true, turn, ended: false, pending: true };
+  }
+  return resumeTurn({ supabase, admin, founderId, sessionId, turn });
 }
 
 /** Re-requests the reply to the latest unanswered question. Never adds a turn, so the cap is not consumed twice. */
@@ -287,7 +419,7 @@ export async function retryReply(params: {
 }): Promise<TurnResult> {
   const { supabase, admin, founderId, sessionId } = params;
 
-  const session = await getSession(supabase, sessionId);
+  const session = await loadSession(supabase, admin, sessionId);
   if (!session) return turnFailure("not_found", TURN_COPY.not_found);
   if (session.status !== "active") return turnFailure("not_active", TURN_COPY.not_active);
 
@@ -303,7 +435,46 @@ export async function retryReply(params: {
     return turnFailure("nothing_to_retry", TURN_COPY.nothing_to_retry);
   }
 
-  return generateReply({ supabase, admin, founderId, sessionId, seq: latest.data.seq, question: latest.data.question });
+  // The claim decides who generates: a retry that finds a live request answers "pending" instead of racing it.
+  return resumeTurn({ supabase, admin, founderId, sessionId, turn: latest.data });
+}
+
+// ---------------------------------------------------------------------------------------------
+// State (resume)
+// ---------------------------------------------------------------------------------------------
+export type SessionState =
+  | {
+      kind: "ok";
+      session: RehearsalSession;
+      turns: StateTurn[];
+      /** What to do about the latest turn when it has no reply; null when it is answered or there are no turns. */
+      pending: PendingState | null;
+    }
+  | { kind: "not_found" }
+  /** The read failed; callers must not treat this as an empty session. */
+  | { kind: "error" };
+
+/**
+ * Everything a client needs to resume: the session (with idle expiry applied), every saved turn once, and what
+ * is happening to the latest unanswered one. Read-only for the founder's data: it never moves
+ * `last_activity_at`, so polling cannot keep a session alive.
+ */
+export async function getSessionState(params: {
+  supabase: SupabaseClient;
+  admin: SupabaseClient;
+  sessionId: string;
+}): Promise<SessionState> {
+  const { supabase, admin, sessionId } = params;
+  const session = await loadSession(supabase, admin, sessionId);
+  if (!session) return { kind: "not_found" };
+  const turns = await listTurnsForState(supabase, sessionId);
+  if (!turns) return { kind: "error" };
+
+  const last = turns.at(-1);
+  const state = last
+    ? classifyTurn({ reply: last.reply, replyStartedAt: last.reply_started_at, now: Date.now() })
+    : null;
+  return { kind: "ok", session, turns, pending: state === null || state === "answered" ? null : state };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -311,7 +482,7 @@ export async function retryReply(params: {
 // ---------------------------------------------------------------------------------------------
 export type EndResult = { ok: true } | { ok: false; code: "not_found" | "server_error"; message: string };
 
-/** Ends the founder's session early. Idempotent: ending an already-ended session succeeds. */
+/** Ends the founder's session early. Idempotent: ending an already-ended (or expired) session succeeds. */
 export async function endSession(params: {
   supabase: SupabaseClient;
   admin: SupabaseClient;
@@ -319,7 +490,7 @@ export async function endSession(params: {
 }): Promise<EndResult> {
   const { supabase, admin, sessionId } = params;
 
-  const session = await getSession(supabase, sessionId);
+  const session = await loadSession(supabase, admin, sessionId);
   if (!session) return { ok: false, code: "not_found", message: TURN_COPY.not_found };
   if (session.status === "ended") return { ok: true };
 

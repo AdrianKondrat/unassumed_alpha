@@ -3,22 +3,24 @@ import Layout from "@/layouts/Layout.astro";
 import { RehearsalChat } from "@/components/rehearsal/RehearsalChat";
 import { toPublicTurn } from "@/lib/services/rehearsal-http";
 import { QUESTION_MAX_LENGTH, REHEARSAL_TURN_CAP } from "@/lib/services/rehearsal-persona";
-import { getAssumptionStatement, getSession, listTurns } from "@/lib/services/rehearsals";
+import { getSessionState } from "@/lib/services/rehearsal-service";
+import { getAssumptionStatement } from "@/lib/services/rehearsals";
 import { createClient } from "@/lib/supabase";
+import { createServiceClient } from "@/lib/supabase-admin";
 import { z } from "zod";
 
 const supabase = createClient(Astro.request.headers, Astro.cookies);
+const admin = createServiceClient();
 const id = z.uuid().safeParse(Astro.params.id);
-if (!supabase || !id.success) return Astro.redirect("/rehearsal");
+if (!supabase || !admin || !id.success) return Astro.redirect("/rehearsal");
 
-// RLS scopes this to the founder's own sessions; anyone else's id is simply not found.
-const session = await getSession(supabase, id.data);
-if (!session) return Astro.redirect("/rehearsal");
+// RLS scopes this to the founder's own sessions; anyone else's id is simply not found. The same function backs
+// the polling route, so first paint already reflects idle expiry and whether the latest reply is in flight.
+const state = await getSessionState({ supabase, admin, sessionId: id.data });
+if (state.kind !== "ok") return Astro.redirect("/rehearsal");
+const { session, turns, pending } = state;
 
-const [turns, assumption] = await Promise.all([
-  listTurns(supabase, session.id),
-  getAssumptionStatement(supabase, session.assumption_id),
-]);
+const assumption = await getAssumptionStatement(supabase, session.assumption_id);
 // Only seq, question and reply ever become page props; the hidden scenario is unreachable from here.
 const initialTurns = turns.map(toPublicTurn);
 ---
@@ -52,6 +54,7 @@ const initialTurns = turns.map(toPublicTurn);
         initialTurns={initialTurns}
         initialStatus={session.status}
         initialEndedReason={session.ended_reason}
+        initialPending={pending}
       />
     </div>
   </div>

@@ -1,5 +1,7 @@
 # Resumable Rehearsal Sessions Implementation Plan
 
+> **IMPLEMENTED on `mvp` (2026-10-01, session 3), reconciled against S-05's real names.** See "Implementation notes" at the end of Progress for what differs from the text below: the migration is `20261001100600_rehearsal_resume.sql`; lease, claim and expiry are service-only DB functions (`rehearsal_add_turn` now takes a key, plus `rehearsal_claim_reply`, `rehearsal_release_reply`, `rehearsal_expire_idle`); the state read is `getSessionState` in `rehearsal-service.ts`; the state route returns `{status, endedReason, turns: [{seq, question, reply, clientKey}], pending}`.
+
 ## Overview
 
 Make an in-progress rehearsal session survive a refresh, tab close or brief disconnect without losing or duplicating any turn, up to session expiry. A re-sent question is deduplicated by a client-generated key, an unanswered turn is resumed under a short lease, and an active session that sits idle for 24h expires into a read-only, still-scorable transcript. This is slice S-07 in `context/foundation/roadmap.md` (PRD FR-017), parallel with S-06.
@@ -279,58 +281,68 @@ No existing data; new columns on tables from a pre-launch slice. `client_key` is
 
 #### Automated
 
-- [ ] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
-- [ ] 1.2 No migration lint errors: `npx supabase db lint`
-- [ ] 1.3 SQL assertions pass: `psql ... -f supabase/tests/rehearsal_resume.sql`
-- [ ] 1.4 Fixture tests pass: `npm run test:rehearsal-resume`
-- [ ] 1.5 Type checking passes: `npx astro check`
-- [ ] 1.6 Linting passes: `npm run lint`
+- [x] 1.1 Migration applies on a fresh DB: `npx supabase db reset` (applied with `stack.sh reset`)
+- [ ] 1.2 No migration lint errors: `npx supabase db lint` (needs Docker; not possible in the sandbox)
+- [x] 1.3 SQL assertions pass: `psql ... -f supabase/tests/rehearsal_resume.sql` (`supabase/tests/rehearsal_resume.sql`; 18 mutations, 17 caught, the survivor is equivalent; 12 parallel same-key sends gave one turn, 12 parallel claims one winner)
+- [x] 1.4 Fixture tests pass: `npm run test:rehearsal-resume` (10 checks, 10 mutations caught)
+- [x] 1.5 Type checking passes: `npx astro check`
+- [x] 1.6 Linting passes: `npm run lint`
 
 #### Manual
 
-- [ ] 1.7 Fixture boundaries (30s lease, 24h expiry) match intended behavior
+- [x] 1.7 Fixture boundaries (30s lease, 24h expiry) match intended behavior
 
 ### Phase 2: Idempotent service and routes
 
 #### Automated
 
-- [ ] 2.1 Type checking passes: `npx astro check`
-- [ ] 2.2 Linting passes: `npm run lint`
-- [ ] 2.3 Build passes: `npm run build`
-- [ ] 2.4 Fixture tests still pass: `npm run test:rehearsal-resume`
+- [x] 2.1 Type checking passes: `npx astro check`
+- [x] 2.2 Linting passes: `npm run lint`
+- [x] 2.3 Build passes: `npm run build`
+- [x] 2.4 Fixture tests still pass: `npm run test:rehearsal-resume`
 
 #### Manual
 
-- [ ] 2.5 Same `clientKey` twice yields one turn; different key while pending returns 409
-- [ ] 2.6 Aborted request shows `in_flight` then `needs_reply`; retry replies without adding a turn
-- [ ] 2.7 Session backdated 25h reads as expired and no longer blocks a new session
+- [x] 2.5 Same `clientKey` twice yields one turn; different key while pending returns 409
+- [x] 2.6 Aborted request shows `in_flight` then `needs_reply`; retry replies without adding a turn
+- [x] 2.7 Session backdated 25h reads as expired and no longer blocks a new session
 
 ### Phase 3: Resilient chat UI
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npx astro check`
-- [ ] 3.2 Linting passes: `npm run lint`
-- [ ] 3.3 Build passes: `npm run build`
-- [ ] 3.4 Smoke test still passes: `npm run smoke`
+- [x] 3.1 Type checking passes: `npx astro check`
+- [x] 3.2 Linting passes: `npm run lint`
+- [x] 3.3 Build passes: `npm run build`
+- [x] 3.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
-- [ ] 3.5 Refresh mid-reply: reply appears without clicking, one turn
-- [ ] 3.6 Tab close right after sending, reopen: question once, reply arrives or auto-resumes
-- [ ] 3.7 Offline send then online: question shows once
-- [ ] 3.8 Backgrounded tab returns with current state
-- [ ] 3.9 Typed-but-unsent text survives a resync
+- [x] 3.5 Refresh mid-reply: reply appears without clicking, one turn
+- [x] 3.6 Tab close right after sending, reopen: question once, reply arrives or auto-resumes
+- [x] 3.7 Offline send then online: question shows once
+- [x] 3.8 Backgrounded tab returns with current state
+- [x] 3.9 Typed-but-unsent text survives a resync
 
 ### Phase 4: End-to-end disruption check and hand-offs
 
 #### Automated
 
-- [ ] 4.1 All checks green together: lint, astro check, build, smoke, test:rehearsal-resume
+- [x] 4.1 All checks green together: lint, astro check, build, smoke, test:rehearsal-resume
 
 #### Manual
 
-- [ ] 4.2 Full 8-turn session with refresh, tab close and offline send ends with exactly 8 turns
-- [ ] 4.3 Double-click Send produces one turn
-- [ ] 4.4 Expired session is read-only, a new session can start, S-06 scoring works on it
-- [ ] 4.5 No scenario text in page source, Network tab, state route or logs
+- [ ] 4.2 Full 8-turn session with refresh, tab close and offline send ends with exactly 8 turns (not run as one session; each disruption was verified on its own, see notes)
+- [x] 4.3 Double-click Send produces one turn
+- [x] 4.4 Expired session is read-only, a new session can start, S-06 scoring works on it
+- [x] 4.5 No scenario text in page source, Network tab, state route or logs (smoke asserts every collected page and API body, the state route included; server logs reviewed in code only)
+
+### Implementation notes (all phases; one manual item and `db lint` left)
+
+- **Schema** (`20261001100600_rehearsal_resume.sql`, additive): `rehearsal_turns.client_key uuid not null` (backfilled by a temporary default) with a unique index on `(session_id, client_key)`, `rehearsal_turns.reply_started_at`, `rehearsal_sessions.last_activity_at`, `ended_reason` widened to `('user','cap','expired')`. The unkeyed S-05 `rehearsal_add_turn(uuid, text)` is dropped and replaced by `rehearsal_add_turn(session, question, client_key)`; the older SQL tests were updated to supply keys. Decisions live in the DB with the DB clock: replay lookup comes before the status check (a lost response to the 8th question still resolves), idle expiry is applied inside `rehearsal_add_turn`, `rehearsal_claim_reply` is one conditional UPDATE (30 s lease), `rehearsal_release_reply` hands the lease back on failure, `rehearsal_expire_idle(project)` ends a stale active session, and `rehearsal_store_reply` clears the lease and bumps `last_activity_at`. Founders still have SELECT only.
+- **Pure module** `src/lib/services/rehearsal-resume.ts` (`REPLY_LEASE_MS`, `SESSION_IDLE_EXPIRY_MS`, `isLeaseStale`, `isSessionExpired`, `classifyTurn`, `resolveReplay`) mirrors the DB boundaries (strictly past 30 s / 24 h) so the app can classify what it reads; the DB stays authoritative.
+- **Service**: `sendTurn` takes `clientKey` and does not check status before the DB call (so replays resolve after end); a replay returns the saved turn, waits (`pending: true`) on a live lease, or resumes a stale one; `retryReply` claims first and answers `pending` when it loses; `getSessionState` returns `ok | not_found | error` (a failed read is an error, never an empty transcript); `startSession`, the list page and every state read free a stale session first.
+- **Routes**: `turns` requires `clientKey` (uuid) and may answer `pending: true`; new `GET /api/rehearsal/sessions/[id]`; bodies stay allow-listed (`toPublicStateTurn`; no lease timestamps).
+- **Hook/UI**: `useRehearsalSession` keeps one key per question text until it is saved (a resend of the same text reuses it), resyncs on mount-visible, `visibilitychange`, `online` and `pageshow`, polls every 2 s only while a reply is in flight elsewhere, resumes an abandoned reply once automatically (then the Try again button), reports a recovered send via `onRecovered` so the chat empties its box only if it still holds that text, and shows a brief "Reconnected" note. Expired sessions render read-only with their own copy and are listed as "Expired after 24 hours idle".
+- **Verification**: SQL (new script plus the three updated ones), `test:rehearsal-resume` (10 checks), 10 new smoke steps (112 total; the lease/expiry steps need `DATABASE_URL` for psql and are skipped without it; CI sets it) incl. real-PostgREST proof that founders cannot write the new columns or call the new functions; 8 app-level mutations caught; a Chromium script (throwaway) checked refresh mid-reply, auto-resume, a lost response (with and without a failed follow-up check), offline, another tab's slow reply arriving by polling, typed text surviving a resync, double-click, and the expired view; 6 hook mutations were run against it. A real bug surfaced this way (the chat did not pass `onRecovered`) and was fixed.
+- **Not verified**: behaviour against the real model and on Cloudflare Workers (if the platform cancels an abandoned request without running cleanup, the lease simply goes stale after 30 s and the reply resumes automatically, which is the path the design relies on); `npx supabase db lint`.

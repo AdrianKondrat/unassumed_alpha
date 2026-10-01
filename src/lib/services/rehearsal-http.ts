@@ -37,6 +37,21 @@ export function toPublicTurn(turn: { seq: number; question: string; reply: strin
   return { seq: turn.seq, question: turn.question, reply: turn.reply };
 }
 
+/** A turn in the resume state: the public turn plus the founder's own idempotency key (so a client can recognise its send). */
+export interface PublicStateTurn extends PublicTurn {
+  clientKey: string;
+}
+
+/** Field by field, like `toPublicTurn`: lease timestamps and any other column stay on the server. */
+export function toPublicStateTurn(turn: {
+  seq: number;
+  question: string;
+  reply: string | null;
+  client_key: string;
+}): PublicStateTurn {
+  return { seq: turn.seq, question: turn.question, reply: turn.reply, clientKey: turn.client_key };
+}
+
 /**
  * True for `application/json` (optionally with a charset). The JSON routes insist on it: a cross-site form
  * or `fetch` cannot send this content type without a CORS preflight the app never answers, so it also stops

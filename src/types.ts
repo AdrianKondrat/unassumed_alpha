@@ -74,7 +74,7 @@ export interface AssumptionClaimLink {
 export type RehearsalStatus = "active" | "ended";
 
 /** Why a session ended. S-07 will add "expired". */
-export type RehearsalEndReason = "user" | "cap";
+export type RehearsalEndReason = "user" | "cap" | "expired";
 
 export interface RehearsalSession {
   id: string;
@@ -84,6 +84,8 @@ export interface RehearsalSession {
   ended_reason: RehearsalEndReason | null;
   created_at: string;
   ended_at: string | null;
+  /** Last accepted question or stored reply. Never moved by reads or polls; drives the 24 h idle expiry. */
+  last_activity_at: string;
 }
 
 /** One question and the persona's reply (null until it lands). Deliberately has no scenario field. */

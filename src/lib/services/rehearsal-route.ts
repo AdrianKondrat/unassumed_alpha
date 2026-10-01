@@ -1,12 +1,12 @@
-// Shared plumbing for the three JSON rehearsal routes (turns, retry, end): authenticate, build both clients,
+// Shared plumbing for the JSON rehearsal routes (turns, retry, end, state): authenticate, build both clients,
 // parse a JSON body, answer in the one response shape. Server-only (imports the service-role client).
 import type { APIContext } from "astro";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase";
 import { createServiceClient } from "@/lib/supabase-admin";
-import { isJsonContentType, statusForCode, toPublicTurn } from "./rehearsal-http";
-import type { TurnResult } from "./rehearsal-service";
+import { isJsonContentType, statusForCode, toPublicStateTurn, toPublicTurn } from "./rehearsal-http";
+import type { SessionState, TurnResult } from "./rehearsal-service";
 
 export function json(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
@@ -51,10 +51,30 @@ export async function readJsonBody(
 
 /** Maps a send/retry outcome to a response. Bodies carry turns (seq, question, reply) and codes, nothing else. */
 export function turnResponse(result: TurnResult): Response {
-  if (result.ok) return json(200, { turn: toPublicTurn(result.turn), ended: result.ended });
+  if (result.ok) {
+    return json(200, {
+      turn: toPublicTurn(result.turn),
+      ended: result.ended,
+      ...(result.pending ? { pending: true } : {}),
+    });
+  }
   return json(statusForCode(result.code), {
     error: result.code,
     message: result.message,
     ...(result.turn ? { turn: toPublicTurn(result.turn) } : {}),
+  });
+}
+
+/** The resume state: session status, every turn once, and what is happening to the latest unanswered one. */
+export function stateResponse(state: SessionState): Response {
+  if (state.kind === "not_found") return json(404, { error: "not_found", message: "We couldn't find that session." });
+  if (state.kind === "error") {
+    return json(500, { error: "server_error", message: "Something went wrong on our side. Try again." });
+  }
+  return json(200, {
+    status: state.session.status,
+    endedReason: state.session.ended_reason,
+    turns: state.turns.map(toPublicStateTurn),
+    pending: state.pending,
   });
 }

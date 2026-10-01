@@ -74,33 +74,33 @@ begin
 
   -- Turn bounds.
   insert into public.rehearsal_sessions (project_id, assumption_id) values (pa, a1) returning id into s;
-  insert into public.rehearsal_turns (session_id, seq, question) values (s, 1, 'First question');
+  insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 1, 'First question');
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (s, 1, 'Duplicate seq');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 1, 'Duplicate seq');
     raise exception 'a duplicate seq was accepted';
   exception when unique_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (s, 9, 'Ninth question');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 9, 'Ninth question');
     raise exception 'seq 9 was accepted';
   exception when check_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (s, 0, 'Zeroth question');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 0, 'Zeroth question');
     raise exception 'seq 0 was accepted';
   exception when check_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (s, 2, repeat('q', 501));
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 2, repeat('q', 501));
     raise exception 'an over-long question was accepted';
   exception when check_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (s, 2, '');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (s, gen_random_uuid(), 2, '');
     raise exception 'an empty question was accepted';
   exception when check_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question, reply) values (s, 2, 'Q', 'a reply without a timestamp');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question, reply) values (s, gen_random_uuid(), 2, 'Q', 'a reply without a timestamp');
     raise exception 'a reply without replied_at was accepted';
   exception when check_violation then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question, reply, replied_at) values (s, 2, 'Q', repeat('r', 2001), now());
+    insert into public.rehearsal_turns (session_id, client_key, seq, question, reply, replied_at) values (s, gen_random_uuid(), 2, 'Q', repeat('r', 2001), now());
     raise exception 'an over-long reply was accepted';
   exception when check_violation then null; end;
   delete from public.rehearsal_sessions where project_id = pa;
@@ -147,16 +147,16 @@ begin
   if n <> 1 then raise exception 'a failed start left a scenario behind (% rows)', n; end if;
 
   -- Unknown session ids.
-  r := public.rehearsal_add_turn(gen_random_uuid(), 'hello');
+  r := public.rehearsal_add_turn(gen_random_uuid(), 'hello', gen_random_uuid());
   if r ->> 'code' <> 'not_found' then raise exception 'unknown session add_turn: %', r; end if;
   r := public.rehearsal_store_reply(gen_random_uuid(), 1, 'hello');
   if r ->> 'code' <> 'not_found' then raise exception 'unknown session store_reply: %', r; end if;
 
   -- Turns 1..8: a new question is refused while the previous one has no reply.
   for i in 1..8 loop
-    r := public.rehearsal_add_turn(s, 'Question ' || i);
+    r := public.rehearsal_add_turn(s, 'Question ' || i, gen_random_uuid());
     if (r ->> 'ok')::boolean is not true or (r ->> 'seq')::int <> i then raise exception 'turn % not added: %', i, r; end if;
-    r := public.rehearsal_add_turn(s, 'Pushy question');
+    r := public.rehearsal_add_turn(s, 'Pushy question', gen_random_uuid());
     if r ->> 'code' <> 'reply_pending' then raise exception 'turn % allowed a second question: %', i, r; end if;
     r := public.rehearsal_store_reply(s, i, 'Reply ' || i);
     if (r ->> 'stored')::boolean is not true then raise exception 'reply % not stored: %', i, r; end if;
@@ -167,7 +167,7 @@ begin
   if st <> 'ended' or why <> 'cap' then raise exception 'cap did not end the session (%, %)', st, why; end if;
   select count(*) into n from public.rehearsal_turns where session_id = s;
   if n <> 8 then raise exception 'expected 8 turns, saw %', n; end if;
-  r := public.rehearsal_add_turn(s, 'Ninth question');
+  r := public.rehearsal_add_turn(s, 'Ninth question', gen_random_uuid());
   if r ->> 'code' <> 'not_active' then raise exception 'a question was accepted after the cap: %', r; end if;
 
   -- Storing a reply twice keeps the first one.
@@ -179,7 +179,7 @@ begin
 
   -- cap_reached: an active session that somehow holds 8 answered turns still refuses a ninth.
   update public.rehearsal_sessions set status = 'active', ended_reason = null, ended_at = null where id = s;
-  r := public.rehearsal_add_turn(s, 'Ninth question');
+  r := public.rehearsal_add_turn(s, 'Ninth question', gen_random_uuid());
   if r ->> 'code' <> 'cap_reached' then raise exception 'cap_reached not reported: %', r; end if;
   update public.rehearsal_sessions set status = 'ended', ended_reason = 'cap', ended_at = now() where id = s;
 
@@ -187,7 +187,7 @@ begin
   s := public.start_rehearsal_session(a2, '{"who":"second"}'::jsonb);
 
   -- Ending: idempotent, with a checked reason; a late reply is still stored without touching the status.
-  r := public.rehearsal_add_turn(s, 'Early question');
+  r := public.rehearsal_add_turn(s, 'Early question', gen_random_uuid());
   if (r ->> 'ok')::boolean is not true then raise exception 'could not add a turn to the new session'; end if;
   begin
     perform public.rehearsal_end_session(s, 'bogus');
@@ -206,10 +206,10 @@ begin
   -- recorded reason stays 'user' (it must not be rewritten to 'cap').
   s := public.start_rehearsal_session(a1, '{"who":"third"}'::jsonb);
   for i in 1..7 loop
-    perform public.rehearsal_add_turn(s, 'Q' || i);
+    perform public.rehearsal_add_turn(s, 'Q' || i, gen_random_uuid());
     perform public.rehearsal_store_reply(s, i, 'R' || i);
   end loop;
-  perform public.rehearsal_add_turn(s, 'Q8');
+  perform public.rehearsal_add_turn(s, 'Q8', gen_random_uuid());
   perform public.rehearsal_end_session(s, 'user');
   r := public.rehearsal_store_reply(s, 8, 'Late R8');
   if (r ->> 'stored')::boolean is not true then raise exception 'the late 8th reply was not stored: %', r; end if;
@@ -218,7 +218,7 @@ begin
 
   -- Founder B gets a session of their own (different project: no clash with A).
   update ids set session_b = public.start_rehearsal_session(ab, '{"who":"b persona"}'::jsonb);
-  perform public.rehearsal_add_turn((select session_b from ids), 'B question');
+  perform public.rehearsal_add_turn((select session_b from ids), 'B question', gen_random_uuid());
 
   -- The service role can read scenarios.
   select count(*) into n from public.rehearsal_scenarios;
@@ -267,7 +267,7 @@ begin
     raise exception 'authenticated deleted a session';
   exception when insufficient_privilege then null; end;
   begin
-    insert into public.rehearsal_turns (session_id, seq, question) values (sa, 1, 'forged');
+    insert into public.rehearsal_turns (session_id, client_key, seq, question) values (sa, gen_random_uuid(), 1, 'forged');
     raise exception 'authenticated inserted a turn';
   exception when insufficient_privilege then null; end;
   begin
@@ -293,7 +293,7 @@ begin
     raise exception 'authenticated ran start_rehearsal_session';
   exception when insufficient_privilege then null; end;
   begin
-    perform public.rehearsal_add_turn(sa, 'forged');
+    perform public.rehearsal_add_turn(sa, 'forged', gen_random_uuid());
     raise exception 'authenticated ran rehearsal_add_turn';
   exception when insufficient_privilege then null; end;
   begin
@@ -315,7 +315,7 @@ declare
 begin
   foreach fn in array array[
     'public.start_rehearsal_session(uuid, jsonb)',
-    'public.rehearsal_add_turn(uuid, text)',
+    'public.rehearsal_add_turn(uuid, text, uuid)',
     'public.rehearsal_store_reply(uuid, integer, text)',
     'public.rehearsal_end_session(uuid, text)'
   ] loop
@@ -371,7 +371,7 @@ begin
   exception when insufficient_privilege then null; end;
   begin perform 1 from public.rehearsal_scenarios; raise exception 'anon read scenarios';
   exception when insufficient_privilege then null; end;
-  begin perform public.rehearsal_add_turn(gen_random_uuid(), 'x'); raise exception 'anon ran rehearsal_add_turn';
+  begin perform public.rehearsal_add_turn(gen_random_uuid(), 'x', gen_random_uuid()); raise exception 'anon ran rehearsal_add_turn';
   exception when insufficient_privilege then null; end;
   begin perform public.rehearsal_end_session(gen_random_uuid(), 'user'); raise exception 'anon ran rehearsal_end_session';
   exception when insufficient_privilege then null; end;
