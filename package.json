@@ -1,21 +1,73 @@
 {
-  "name": "unassumed-website",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Unassumed marketing site — static assets on Cloudflare Workers with a Resend-backed waitlist endpoint.",
+  "name": "10x-astro-starter",
   "type": "module",
-  "engines": { "node": ">=20.0.0" },
+  "version": "0.0.1",
   "scripts": {
-    "build": "node scripts/build.mjs",
-    "dev": "npm run build && wrangler dev",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run build && npm run typecheck && wrangler deploy --dry-run",
-    "deploy": "npm run build && npm run typecheck && wrangler deploy",
-    "tail": "wrangler tail",
-    "cf-typegen": "wrangler types"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "smoke": "node scripts/smoke.mjs"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/cloudflare": "^14.3.1",
+    "@astrojs/react": "^6.0.5",
+    "@astrojs/sitemap": "^3.7.4",
+    "@eslint/config-helpers": "^0.7.0",
+    "@radix-ui/react-slot": "^1.1.2",
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.99.1",
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "astro": "^7.3.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "tailwind-merge": "^3.5.0",
+    "tailwindcss": "^4.2.4",
+    "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "wrangler": "^4.129.0"
+    "@eslint/compat": "^2.1.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-astro": "^3.1.0",
+    "eslint-plugin-jsx-a11y": "6.10.2",
+    "eslint-plugin-prettier": "^5.5.6",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "husky": "9.1.7",
+    "lint-staged": "^16.3.3",
+    "prettier": "^3.9.6",
+    "prettier-plugin-astro": "^1.0.0",
+    "prettier-plugin-tailwindcss": "^0.8.1",
+    "supabase": "^2.23.4",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "wrangler": "^4.131.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,astro}": [
+      "eslint --fix"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
+  },
+  "overrides": {
+    "eslint-plugin-react": {
+      "eslint": "$eslint"
+    },
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    }
   }
 }

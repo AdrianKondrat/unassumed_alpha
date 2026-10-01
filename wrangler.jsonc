@@ -1,82 +1,15 @@
-/**
- * Cloudflare Workers configuration.
- *
- * The site is static assets served straight from Cloudflare's edge, plus one
- * Worker route (`POST /api/waitlist`). Because `run_worker_first` is not set,
- * every request that matches a file in `public/` is served by the assets
- * pipeline without ever invoking the Worker — so the page itself costs no
- * Worker invocations and is not subject to Worker CPU limits.
- *
- * Secrets (RESEND_API_KEY, optional TURNSTILE_SECRET_KEY) are NOT in this file
- * and must never be added to it — this file is committed to a public repo.
- * Local:      .dev.vars   (git-ignored)
- * Production: npx wrangler secret put RESEND_API_KEY, or the dashboard
- */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "unassumed-website",
-  "main": "src/index.ts",
-
-  // Pin the runtime's behaviour. Raising this date opts into newer runtime
-  // semantics; do it deliberately and re-test, never as a routine bump.
-  "compatibility_date": "2026-09-05",
-
-  // Workers Logs. Required to see `console.error` from a failed Resend call.
+  "name": "10x-astro-starter",
+  "main": "@astrojs/cloudflare/entrypoints/server",
+  "compatibility_date": "2026-05-08",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "binding": "ASSETS",
+    "directory": "./dist",
+    "not_found_handling": "404-page",
+  },
   "observability": {
     "enabled": true,
-    "head_sampling_rate": 1
   },
-
-  "assets": {
-    "directory": "./public",
-    "binding": "ASSETS",
-
-    // "/privacy" serves privacy.html; "/privacy/" redirects to "/privacy".
-    "html_handling": "auto-trailing-slash",
-
-    // "none" = a request with no matching asset falls through to the Worker,
-    // which is what routes /api/waitlist and renders our own 404.
-    "not_found_handling": "none"
-  },
-
-  // Waitlist storage. The signup row is written before Resend is called, so an
-  // email outage costs a notification, not a signup. Apply the schema with:
-  //   npx wrangler d1 migrations apply unassumed-alpha --remote
-  "d1_databases": [
-    {
-      "binding": "DB",
-      // Label only — `database_id` is what actually binds. Correct this if the
-      // database is called something else in your dashboard.
-      "database_name": "unassumed-alpha",
-      "database_id": "7ea31764-1dc7-4108-bec9-e7a13b495d3d",
-      "migrations_dir": "migrations"
-    }
-  ],
-
-  // Per-IP throttle in front of the Resend call. `namespace_id` is any integer
-  // that is unique within your Cloudflare account.
-  "ratelimits": [
-    {
-      "name": "WAITLIST_LIMITER",
-      "namespace_id": "1001",
-      "simple": { "limit": 5, "period": 60 }
-    }
-  ],
-
-  // Non-secret configuration.
-  //
-  // These are the authority: `wrangler deploy` replaces the Worker's plain-text
-  // variables with exactly this set, so a variable added in the dashboard and
-  // not listed here is removed on the next deploy. Secrets are separate and are
-  // never touched by a deploy.
-  "vars": {
-    "SITE_ORIGIN": "https://unassumed.com",
-    "BRAND_NAME": "Unassumed",
-    "WAITLIST_NOTIFICATION_TO": "office@hailanderstudio.com",
-    "WAITLIST_FROM_EMAIL": "UNASSUMED <office@hailanderstudio.com>",
-    "SEND_CONFIRMATION": "true"
-  }
-
-  // Add your zone here once DNS is on Cloudflare, then `npm run deploy`:
-  // "routes": [{ "pattern": "unassumed.com", "custom_domain": true }]
 }

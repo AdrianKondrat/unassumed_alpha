@@ -1,169 +1,192 @@
-# Unassumed — website
+# 10x Astro Starter
 
-Production landing page for Unassumed. Static assets served from Cloudflare's
-edge, with a single Worker route (`POST /api/waitlist`) that sends waitlist
-signups to **office@hailanderstudio.com** through Resend.
+![](./public/template.png)
 
-No framework, no bundler, no runtime dependencies. `public/` is the site exactly
-as it ships.
+A modern, opinionated starter template for building fast, accessible web applications.
 
----
+## Tech Stack
 
-## Before the first deploy — do these five things
+- [Astro](https://astro.build/) v7 - Modern web framework with server-first rendering
+- [React](https://react.dev/) v19 - UI library for interactive components
+- [TypeScript](https://www.typescriptlang.org/) v6 - Type-safe JavaScript
+- [Tailwind CSS](https://tailwindcss.com/) v4 - Utility-first CSS framework
+- [Supabase](https://supabase.com/) - Authentication and backend-as-a-service
+- [Cloudflare Workers](https://workers.cloudflare.com/) - Edge deployment runtime
 
-1. **Set your domain.** Edit `vars.SITE_ORIGIN` in `wrangler.jsonc` (no trailing
-   slash), then run `npm run build`. That one value propagates to every canonical
-   URL, Open Graph tag, `sitemap.xml` and `robots.txt` entry.
-2. **Verify a sending domain in Resend.** Resend → Domains → Add Domain, then add
-   the DKIM, SPF and DMARC records to Cloudflare DNS. `WAITLIST_FROM_EMAIL` must
-   be an address on that domain (currently `hailanderstudio.com`). Until the
-   domain is verified, every send is rejected.
-3. **Add the API key as a secret** — never in a committed file, and this repo is
-   public:
-   ```bash
-   npx wrangler secret put RESEND_API_KEY
-   ```
-   Create the key at resend.com/api-keys with **Sending access** only.
-4. **Apply the database schema:**
-   ```bash
-   npx wrangler d1 migrations apply unassumed-alpha --remote
-   ```
-5. **Fill in the privacy notice.** `public/privacy.html` has bracketed
-   placeholders for your registered company name, address and the transfer
-   mechanism in your Resend and Cloudflare contracts.
-6. **Decide the bracketed values on the page.** The price, the beta date and the
-   rehearsal count render as deliberate blanks (`[$6.99]`, `Nov 2026`, `[5]`).
-   That is a design device, not an oversight — but confirm you want it live.
+## Prerequisites
 
----
+- Node.js v22.14.0 (as specified in `.nvmrc`)
+- npm (comes with Node.js)
 
-## Commands
+## Getting Started
+
+1. Clone the repository:
 
 ```bash
-npm install          # once
-npx wrangler d1 migrations apply unassumed-alpha --local   # once, for local dev
-npm run dev          # wrangler dev — the real Worker, locally
-npm run check        # build + typecheck + deploy dry-run. Run before every push.
-npm run deploy       # build + typecheck + wrangler deploy
-npm run tail         # live production logs
+git clone https://github.com/przeprogramowani/10x-astro-starter.git
+cd 10x-astro-starter
 ```
 
-Local development needs `.dev.vars` (git-ignored). Copy `.dev.vars.example` and
-put a real Resend key in it if you want to send test mail; the file is never
-uploaded and never committed.
-
-**Variables set in the dashboard are not authoritative.** `wrangler deploy`
-replaces the Worker's plain-text variables with exactly the `vars` block in
-`wrangler.jsonc`, so a variable added in the dashboard and not listed there is
-removed on the next deploy. Secrets are separate and a deploy never touches them.
-
----
-
-## How it is put together
-
-```
-wrangler.jsonc        Deployment config. SITE_ORIGIN and the other vars live here.
-scripts/build.mjs     The whole build: propagates the origin, regenerates _headers.
-src/
-  index.ts            Routing. /api/waitlist, /api/* → 404, everything else → 404 page.
-  waitlist.ts         The endpoint: origin check, rate limit, honeypot, validation.
-  email.ts            Resend over fetch. Notification + confirmation templates.
-  validate.ts         Email parsing and HTML escaping.
-  storage.ts          D1 writes. Degrades rather than throws.
-  security.ts         Response headers, origin check, optional Turnstile.
-  env.ts              Bindings.
-migrations/           D1 schema. Applied with `wrangler d1 migrations apply`.
-public/               The site. Edit these files directly.
-  _headers            GENERATED — do not edit. Change scripts/build.mjs instead.
-```
-
-**Requests never touch the Worker unless they have to.** `run_worker_first` is
-not set, so anything matching a file in `public/` is served straight from the
-edge — the landing page costs zero Worker invocations.
-
-### The form
-
-Both forms are real HTML forms that `POST` to `/api/waitlist`. `app.js` only
-intercepts the submit to avoid a page navigation. **If the script fails to load,
-signups still work** — the endpoint accepts `application/x-www-form-urlencoded`
-and answers with a 303 to `/thanks`.
-
-Abuse controls, in the order they run:
-
-| Control | Where |
-|---|---|
-| Same-origin check (`Origin`/`Referer` vs `SITE_ORIGIN`) | `src/security.ts` |
-| Per-IP rate limit, 5 per 60s | `ratelimits` binding, `wrangler.jsonc` |
-| Honeypot field (`company`) — silently accepted, nothing sent | `src/waitlist.ts` |
-| 4 KB body cap | `src/waitlist.ts` |
-| Duplicate suppression (unique index) | `migrations/0001_*.sql` |
-| Turnstile — **off by default**, enabled by setting the secret | `src/security.ts` |
-
-There is no CORS header anywhere, so nothing can read a response cross-origin.
-
-To turn Turnstile on: add the widget to both forms, add
-`https://challenges.cloudflare.com` to `script-src` and `frame-src` in
-`scripts/build.mjs`, run `npm run build`, then
-`npx wrangler secret put TURNSTILE_SECRET_KEY`.
-
-### Where signups are stored
-
-D1, table `waitlist_signups`. **The row is written before Resend is called**, so
-an email outage costs a notification, not a signup. The four outcomes:
-
-| Row written | Email sent | Visitor sees | Why |
-|---|---|---|---|
-| ✅ | ✅ | success | normal |
-| ✅ | ❌ | **success** | the address is safe; failing the visitor over our outage would lose a real signup for nothing |
-| — (duplicate) | not attempted | success | already on the list; re-sending on demand would make the form a way to mail-bomb someone |
-| ❌ | ❌ | 502 | it landed nowhere, so they must be told |
-
-After any Resend outage, this is the recovery query:
-
-```sql
-SELECT email, created_at FROM waitlist_signups WHERE notified_at IS NULL ORDER BY created_at;
-```
-
-Deduplication is on a fully lower-cased copy of the address (`email_normalised`,
-unique index), while `email` keeps the local part as typed — RFC 5321 makes local
-parts case-sensitive. `ON CONFLICT DO NOTHING` does the check in one statement,
-so two simultaneous submissions of the same address cannot both win.
-
-The `DB` binding is optional in code. If it is missing, the endpoint degrades to
-email-only rather than refusing signups.
-
-Useful queries:
+2. Install dependencies:
 
 ```bash
-npx wrangler d1 execute unassumed-alpha --remote --command \
-  "SELECT COUNT(*) FROM waitlist_signups"
-npx wrangler d1 execute unassumed-alpha --remote --command \
-  "SELECT source, COUNT(*) FROM waitlist_signups GROUP BY source"   # which form converts
+npm install
 ```
 
-### Security headers
+3. Set up Supabase and configure environment variables — see [Supabase Configuration](#supabase-configuration) below.
 
-`public/_headers` is regenerated by `npm run build`, including the SHA-256 hash
-of the inline JSON-LD block. That hash is what lets the Content-Security-Policy
-drop `'unsafe-inline'`. **If you add an inline `<script>` or `<style>` to any
-page, run `npm run build` or the browser will silently refuse to run it.**
+4. Create a `.dev.vars` file for local Cloudflare dev secrets:
 
-### Fonts
-
-Self-hosted in `public/fonts/` — latin-subset variable WOFF2, 169 KB total. No
-request ever goes to Google, which is both faster and one fewer third party to
-declare in the privacy notice. Only the two faces that paint above the fold are
-preloaded.
-
----
-
-## DNS and routing
-
-Once the domain is on Cloudflare, uncomment `routes` in `wrangler.jsonc`:
-
-```jsonc
-"routes": [{ "pattern": "unassumed.com", "custom_domain": true }]
+```bash
+cp .env.example .dev.vars
 ```
 
-Then add a redirect rule in the dashboard so one of `www` / apex is canonical —
-that belongs at the DNS layer, not in this code.
+5. Run the development server:
+
+```bash
+npm run dev
+```
+
+## Available Scripts
+
+- `npm run dev` - Start development server (Cloudflare workerd runtime)
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint with type-checked rules
+- `npm run lint:fix` - Auto-fix ESLint issues
+- `npm run format` - Run Prettier
+- `npm run smoke` - Smoke test the auth flow against a running server (`BASE_URL`, defaults to `http://localhost:4321`)
+
+## Project Structure
+
+```md
+.
+├── src/
+│ ├── layouts/ # Astro layouts
+│ ├── pages/ # Astro pages
+│ │ └── api/ # API endpoints
+│ ├── components/ # UI components (Astro & React)
+│ └── assets/ # Static assets
+├── public/ # Public assets
+├── wrangler.jsonc # Cloudflare Workers config
+```
+
+## Supabase Configuration
+
+This project uses [Supabase](https://supabase.com/) for authentication. Environment variables are declared via Astro's `astro:env` schema and are treated as **server-only secrets** — they are never exposed to the client.
+
+### First-time setup (local, no cloud project needed)
+
+Requires [Docker](https://www.docker.com/) and ~7 GB RAM.
+
+1. Create your `.env` file:
+
+```bash
+cp .env.example .env
+```
+
+2. Initialize the local Supabase project (creates a `supabase/` config folder):
+
+```bash
+npx supabase init
+```
+
+3. Start the local stack (downloads Docker images on first run):
+
+```bash
+npx supabase start
+```
+
+4. Copy the credentials printed by the CLI into your `.env` and `.dev.vars`:
+
+```
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_KEY=<anon key from CLI output>
+```
+
+5. To stop the stack when done:
+
+```bash
+npx supabase stop
+```
+
+The local Studio UI is available at `http://localhost:54323`.
+
+No database tables or migrations are required — this project uses Supabase Auth's built-in `auth.users` table only.
+
+### Using a cloud Supabase project instead
+
+If you prefer to use a hosted Supabase project, add these variables to your `.env` and `.dev.vars` files:
+
+| Variable       | Description                                                |
+| -------------- | ---------------------------------------------------------- |
+| `SUPABASE_URL` | Project URL from Supabase dashboard → Settings → API       |
+| `SUPABASE_KEY` | `anon` public key from Supabase dashboard → Settings → API |
+
+```
+SUPABASE_URL=https://<project-ref>.supabase.co
+SUPABASE_KEY=<anon-key>
+```
+
+### Email confirmation in local development
+
+By default Supabase requires email confirmation before a user can sign in. To skip this during local development:
+
+1. Open the Supabase dashboard for your project
+2. Go to **Authentication → Email → Confirm email**
+3. Toggle it **off**
+
+Users can then sign in immediately after sign-up without clicking a confirmation link.
+
+### Auth routes
+
+| Route                 | Description                                                             |
+| --------------------- | ----------------------------------------------------------------------- |
+| `/auth/signin`        | Email/password sign-in form                                             |
+| `/auth/signup`        | Email/password sign-up form                                             |
+| `/auth/confirm-email` | Post-signup "check your inbox" page                                     |
+| `/dashboard`          | Example protected page (redirects to `/auth/signin` if unauthenticated) |
+
+Route protection is handled in `src/middleware.ts`. Add paths to the `PROTECTED_ROUTES` array there to require authentication.
+
+## Deployment
+
+This project deploys to [Cloudflare Workers](https://workers.cloudflare.com/).
+
+1. Build the project:
+
+```bash
+npm run build
+```
+
+2. Deploy with Wrangler:
+
+```bash
+npx wrangler deploy
+```
+
+Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or via `npx wrangler secret put`.
+
+## Smoke test
+
+`scripts/smoke.mjs` is a dependency-free Node script that walks the whole auth flow (sign-up, sign-in, protected page, sign-out) over HTTP. Run it against the dev server or the production preview after dependency upgrades:
+
+```bash
+npm run dev            # or: npm run build && npm run preview
+BASE_URL=http://localhost:4321 npm run smoke
+```
+
+It needs a reachable Supabase instance (local or cloud) with email confirmation disabled.
+
+> **Note:** this script exists primarily to guard the development of the starter itself — it is a fast sanity check that dependency upgrades did not break the build, the Cloudflare adapter or the Supabase auth flow. It is **not** a substitute for a real test suite. Once you build your own product on top of this starter, add proper tests (unit, integration, end-to-end) suited to your application.
+
+## CI
+
+GitHub Actions runs two jobs on every push and PR to `master`:
+
+- **ci** — lint, `astro check` and build. Configure `SUPABASE_URL` and `SUPABASE_KEY` as repository secrets for the build step.
+- **smoke** — starts a local Supabase via the Supabase CLI, builds, serves the production preview on the Cloudflare runtime and runs `npm run smoke` against it. No secrets required.
+
+## License
+
+MIT
