@@ -302,51 +302,53 @@ No existing data to migrate — this is a new table in a pre-launch project.
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles. See `references/progress-format.md`.
 
+> Implementation notes: the pure core lives in `src/lib/ai-request.ts` (importable by Node for tests) and `src/lib/ai.ts` is the thin Astro wrapper. `complete()` also accepts `timeoutMs`, `retry` and `jsonMode` (S-06 needs the first two). `OPENROUTER_BASE_URL` is an optional env override used for local fakes. `test:ai` runs via `node --experimental-strip-types` and also covers retry/timeout/error mapping and no-leak with an injected fake fetch (28 checks).
+
 ### Phase 1: Secrets & environment plumbing
 
 #### Automated
 
-- [ ] 1.1 Type checking passes: `npx astro check`
-- [ ] 1.2 Linting passes: `npm run lint`
-- [ ] 1.3 Build succeeds locally with `OPENROUTER_API_KEY` unset: `npm run build`
+- [x] 1.1 Type checking passes: `npx astro check`
+- [x] 1.2 Linting passes: `npm run lint`
+- [x] 1.3 Build succeeds locally with `OPENROUTER_API_KEY` unset: `npm run build`
 
 #### Manual
 
-- [ ] 1.4 `OPENROUTER_API_KEY` GitHub Actions repository secret added
-- [ ] 1.5 Cloudflare Pages/Workers secret binding for `OPENROUTER_API_KEY` added
+- [ ] 1.4 `OPENROUTER_API_KEY` GitHub Actions repository secret added (operational: add in GitHub repo secrets)
+- [ ] 1.5 Cloudflare Pages/Workers secret binding for `OPENROUTER_API_KEY` added (operational: Cloudflare Worker secret)
 
 ### Phase 2: Usage ledger migration
 
 #### Automated
 
-- [ ] 2.1 Migration applies cleanly against local Supabase: `supabase db reset`
+- [x] 2.1 Migration applies cleanly against local Supabase: `supabase db reset`
 
 #### Manual
 
-- [ ] 2.2 Table and both RLS policies confirmed via Supabase Studio / `supabase db diff`
-- [ ] 2.3 RLS confirmed: own-row insert succeeds, other-founder insert rejected
+- [ ] 2.2 Table and both RLS policies confirmed via Supabase Studio / `supabase db diff` (SQL test supabase/tests/ai_usage_events.sql covers this)
+- [ ] 2.3 RLS confirmed: own-row insert succeeds, other-founder insert rejected (covered by supabase/tests/ai_usage_events.sql)
 
 ### Phase 3: AI client module
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npx astro check`
-- [ ] 3.2 Linting passes: `npm run lint`
-- [ ] 3.3 Build succeeds: `npm run build`
+- [x] 3.1 Type checking passes: `npx astro check`
+- [x] 3.2 Linting passes: `npm run lint`
+- [x] 3.3 Build succeeds: `npm run build`
 
 #### Manual
 
-- [ ] 3.4 Manual `complete()` call with real API key returns `{ ok: true, ... }`
-- [ ] 3.5 One new `ai_usage_events` row confirmed per successful call
-- [ ] 3.6 Invalid API key produces typed `{ ok: false }` result, not an unhandled exception
+- [ ] 3.4 Manual `complete()` call with real API key returns `{ ok: true, ... }` (not possible in build sandbox: openrouter.ai is blocked by the egress policy; run once locally with a real key)
+- [ ] 3.5 One new `ai_usage_events` row confirmed per successful call (needs a real key; insert path covered by the SQL test)
+- [ ] 3.6 Invalid API key produces typed `{ ok: false }` result, not an unhandled exception (typed failure paths covered offline by test:ai)
 
 ### Phase 4: Automated verification
 
 #### Automated
 
-- [ ] 4.1 New script passes locally: `npm run test:ai`
-- [ ] 4.2 CI `ci` job passes end-to-end with the new step included
+- [x] 4.1 New script passes locally: `npm run test:ai`
+- [ ] 4.2 CI `ci` job passes end-to-end with the new step included (runs on first push to a CI-enabled branch)
 
 #### Manual
 
-- [ ] 4.3 Deliberately breaking the privacy flag locally confirms `npm run test:ai` fails
+- [ ] 4.3 Deliberately breaking the privacy flag locally confirms `npm run test:ai` fails (verified: removing the flag fails 4 checks)

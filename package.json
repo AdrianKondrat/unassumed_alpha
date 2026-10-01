@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "smoke": "node scripts/smoke.mjs"
+    "smoke": "node scripts/smoke.mjs",
+    "test:ai": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-ai-client.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",

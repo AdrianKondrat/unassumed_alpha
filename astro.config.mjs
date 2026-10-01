@@ -18,6 +18,9 @@ export default defineConfig({
     schema: {
       SUPABASE_URL: envField.string({ context: "server", access: "secret", optional: true }),
       SUPABASE_KEY: envField.string({ context: "server", access: "secret", optional: true }),
+      OPENROUTER_API_KEY: envField.string({ context: "server", access: "secret", optional: true }),
+      // Optional: point the AI call path at another OpenRouter-compatible endpoint (local fakes, proxies).
+      OPENROUTER_BASE_URL: envField.string({ context: "server", access: "secret", optional: true }),
     },
   },
 });
