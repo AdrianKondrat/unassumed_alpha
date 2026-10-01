@@ -34,8 +34,52 @@ const CANVAS_KEYS = [
   "cost_structure",
 ];
 
+/** The "[N] Founder: ..." lines of a scoring transcript, as {seq, question}. */
+function scoreTurns(messages) {
+  const user = messages.find((m) => m.role === "user")?.content ?? "";
+  return [...user.matchAll(/^\[(\d+)\] Founder: (.*)$/gm)].map((m) => ({ seq: Number(m[1]), question: m[2] }));
+}
+
 /** Handlers: first whose `match(systemPrompt)` is true answers. `respond` returns the assistant text. */
 const HANDLERS = [
+  {
+    // Scoring comes first: its transcript embeds founder text, so no other handler's phrase should win by accident.
+    task: "score",
+    match: (system) => system.includes("You review the questions a first-time founder asked"),
+    respond: (messages, replyMode) => {
+      const turns = scoreTurns(messages);
+      const flags = [];
+      for (const turn of turns) {
+        const q = turn.question.toLowerCase();
+        if (q.includes("would you")) {
+          flags.push({
+            position: turn.seq,
+            label: "hypothetical",
+            explanation: "Asks what you would do, not what you did.",
+          });
+        } else if (q.includes("don't you think") || q.includes("wouldn't")) {
+          flags.push({
+            position: turn.seq,
+            label: "leading",
+            explanation: "The wording suggests the answer you hope for.",
+          });
+        }
+      }
+      const target = flags[0]?.position ?? turns[0]?.seq ?? 1;
+      const result = {
+        summary: `You asked ${turns.length} questions and ${flags.length} had a wording problem. Keep asking about real events.`,
+        flags,
+        rewrites: [{ position: target, suggestion: "Tell me about the last time you bought a gardening tool." }],
+      };
+      if (replyMode === "viability") result.summary = "Your idea is validated by these answers.";
+      if (replyMode === "unknown_claim" || replyMode === "short") {
+        result.flags.push({ position: 99, label: "leading", explanation: "Points at a turn that does not exist." });
+      }
+      return JSON.stringify(result);
+    },
+    // Counts only, never text.
+    extra: (messages) => ({ turnsSent: scoreTurns(messages).length }),
+  },
   {
     task: "draft",
     match: (system) => system.includes("first draft of a Business Model Canvas"),

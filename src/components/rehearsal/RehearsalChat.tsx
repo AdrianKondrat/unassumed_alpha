@@ -233,12 +233,16 @@ export function RehearsalChat(props: RehearsalChatProps) {
         <div className="card p-6">
           <h2 className="disp text-3xl">Session ended</h2>
           <p className="text-ink-soft mt-3">
-            {ENDED_COPY[endedReason ?? "user"]} Your transcript is saved above. Scoring your questions isn&apos;t
-            available yet.
+            {ENDED_COPY[endedReason ?? "user"]} Your transcript is saved above. Next, see how your questions did.
           </p>
-          <a href="/rehearsal" className="btn btn-yellow mt-5">
-            Back to rehearsal
-          </a>
+          <div className="mt-5 flex flex-wrap items-center gap-4">
+            <a href={`/rehearsal/${props.sessionId}/scorecard`} className="btn btn-yellow">
+              See your scorecard
+            </a>
+            <a href="/rehearsal" className="link">
+              Back to rehearsal
+            </a>
+          </div>
         </div>
       )}
     </div>

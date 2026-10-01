@@ -37,7 +37,7 @@ First-time founders tend to ask their prospective customers leading, hypothetica
 | S-03 | manual-canvas-editing-with-conflict-safety | edit canvas claims manually with edits protected against silent overwrite                                     | S-02          | FR-007, FR-008                 | ready       |
 | S-04 | assumption-suggestion-and-lifecycle        | request AI-suggested assumptions, accept/edit/reject them, set lifecycle status                               | S-02, F-02    | FR-009, FR-010, FR-011         | done        |
 | S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | ready       |
-| S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | in progress |
+| S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | done        |
 | S-07 | resumable-rehearsal-sessions               | resume a disrupted session without losing or duplicating turns                                                | S-05          | FR-017                         | ready       |
 
 ## Streams
@@ -53,7 +53,7 @@ Navigation aid — groups items that share a Prerequisites chain. Canonical orde
 
 ## Baseline
 
-> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01, S-02, S-04 and S-05 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
+> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01, S-02, S-04, S-05 and S-06 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
 
 What's already in place in the codebase as of 2026-09-27 (auto-researched + user-confirmed). Foundations below assume these are present and do NOT re-scaffold them.
 
@@ -178,7 +178,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **Unknowns:**
   - ~~Can persona-turn scoring complete synchronously within Workers limits?~~ Resolved (`context/changes/rehearsal-scorecard/research.md`): yes on the Workers Paid plan with one batched call and a shared ~25s deadline; no Workflow/queue. Remaining check: measure p95 against the real model (plan Phase 5).
 - **Risk:** This is the core value-delivery moment of the whole release and the PRD's Primary Success Criterion in miniature — it's also the one place the tech-stack hand-off flagged an unresolved architecture question (edge runtime vs. background job) that must be settled before this slice can be planned.
-- **Status:** in progress on `mvp` — schema, scoring module, deadline-bound service and `POST /api/rehearsal/sessions/[id]/score` are built and verified; the scorecard page/UI, fake-provider handler, smoke steps and docs wrap-up remain (see `context/foundation/handoff.md`, "RESUME HERE: S-06"). Scoring is triggered from the scorecard page rather than the end-session request.
+- **Status:** done — implemented on `mvp` (S-06 part 1 commit 13066c3: schema, scoring module, service, route; part 2: scorecard page and island, fake-provider handler, smoke steps). Scoring is triggered from the scorecard page rather than the end-session request, and there is no numeric score. Remaining live check: plan Phase 5 (latency and wording against the real model; `openrouter.ai` is blocked in the build sandbox).
 
 ### S-07: Resumable rehearsal sessions
 
@@ -204,7 +204,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 | S-03       | manual-canvas-editing-with-conflict-safety | Manual canvas editing with conflict-safe saves                   | no                    | Ready after S-02; reconcile plan first         |
 | S-04       | assumption-suggestion-and-lifecycle        | AI-suggested assumptions + accept/edit/reject + lifecycle status | done                  | Implemented                                    |
 | S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | done                  | Implemented                                    |
-| S-06       | rehearsal-scorecard                        | Automatic post-session scorecard with cited flags                | in progress           | Phases 1-3 built; UI + smoke remain            |
+| S-06       | rehearsal-scorecard                        | Automatic post-session scorecard with cited flags                | done                  | Implemented; live-model check (Phase 5) pending |
 | S-07       | resumable-rehearsal-sessions               | Idempotent resume for disrupted rehearsal sessions               | no                    | Plan exists; after S-05                        |
 
 ## Open Roadmap Questions
@@ -229,4 +229,5 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **S-02 ai-drafted-canvas-from-brief** — one project from a brief, AI-drafted 9-block canvas with distinct AI-draft markers, DB-enforced one-project cap, race-safe drafting lease. 2026-10-01 (live-key check pending).
 - **S-04 assumption-suggestion-and-lifecycle** — AI-suggested candidates, accept / edit / reject gate, manual lifecycle status, DB-enforced transition rules, atomic batch insert. 2026-10-01 (live-key check pending).
 - **S-05 rehearsal-session-turn-exchange** — hidden-persona rehearsal: start on an active assumption, up to 8 questions, retry without losing a question, end early or automatically at the cap; persona scenario unreadable by any client (DB privileges + RLS), writes via service-only DB functions. 2026-10-01 (live-key check pending).
+- **S-06 rehearsal-scorecard** — page-triggered, deadline-bound scoring of the founder's questions: five problem labels with exact quoted turns (copied in SQL, never from the model), at least one rewrite, a beta disclaimer first, no numeric score and no viability wording; scorecards writable only by service-only DB functions. 2026-10-01 (live-model latency/wording check pending).
 - **F-03 mvp-branch-deploy-pipeline** — built, awaiting first real deploy (see item status).

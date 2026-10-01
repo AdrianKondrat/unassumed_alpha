@@ -192,6 +192,16 @@ const NIL_ID = "11111111-1111-1111-1111-111111111111";
 let rehearsable = [];
 let sessionOne = "";
 let sessionTwo = "";
+let zeroSession = "";
+let sessionThree = "";
+/** Page text with entities decoded and runs of whitespace collapsed, so assertions ignore markup wrapping and escaping. */
+const flat = (text) =>
+  text
+    .replaceAll("&#39;", "'")
+    .replaceAll("&#x27;", "'")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&amp;", "&")
+    .replace(/\s+/g, " ");
 const emailB = `smoke-b-${Date.now()}@example.com`;
 
 /** The founder's Supabase access token, read from the auth cookie (chunked and base64url-encoded by @supabase/ssr). */
@@ -237,6 +247,11 @@ const steps = [
     { status: 302, location: "/auth/signin" },
   ],
   [
+    "scorecard page redirects anonymous user",
+    () => request(`/rehearsal/${NIL_ID}/scorecard`),
+    { status: 302, location: "/auth/signin" },
+  ],
+  [
     "starting a rehearsal anonymously is refused",
     post("/api/rehearsal/sessions", { assumptionId: NIL_ID }),
     { status: 302, location: "/auth/signin" },
@@ -244,7 +259,7 @@ const steps = [
   [
     "rehearsal JSON routes answer 401 to anonymous callers",
     async () => {
-      for (const action of ["turns", "retry", "end"]) {
+      for (const action of ["turns", "retry", "end", "score"]) {
         const r = await api(sessionApi(NIL_ID, action), { json: { question: "hello" } });
         check(r.status === 401, `${action}: expected 401, saw ${r.status}`);
       }
@@ -1137,6 +1152,227 @@ const steps = [
           { status: 200 },
         ],
         [
+          "scoring refuses an unfinished session, bad ids and non-JSON bodies, without spending AI",
+          async () => {
+            const start = await startRehearsal(rehearsable[2]);
+            zeroSession = sessionIdFrom(start.location);
+            check(zeroSession !== "", `third start: ${start.location}`);
+            callsBefore = (await aiCalls()).length;
+            const early = await api(sessionApi(zeroSession, "score"));
+            check(early.status === 409 && early.data.error === "not_ended", `active: ${early.status}`);
+            const form = await api(sessionApi(zeroSession, "score"), { body: "", contentType: "text/plain" });
+            check(form.status === 415, `non-JSON: ${form.status}`);
+            const ghost = await api(sessionApi(NIL_ID, "score"));
+            check(ghost.status === 404 && ghost.data.error === "not_found", `unknown id: ${ghost.status}`);
+            const bad = await api(sessionApi("not-a-uuid", "score"));
+            check(bad.status === 404, `malformed id: ${bad.status}`);
+            const page = await request(`/rehearsal/${zeroSession}/scorecard`);
+            check(page.status === 302 && page.location === `/rehearsal/${zeroSession}`, `page: ${page.location}`);
+            const malformed = await request("/rehearsal/not-a-uuid/scorecard");
+            check(
+              malformed.status === 302 && malformed.location === "/rehearsal",
+              `malformed page: ${malformed.status}`,
+            );
+            check((await aiCalls()).length === callsBefore, "an unscorable request reached the AI");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a session ended before any question is 'insufficient': no assessment and no AI call",
+          async () => {
+            const end = await api(sessionApi(zeroSession, "end"));
+            check(end.status === 200, `end: ${end.status}`);
+            callsBefore = (await aiCalls()).length;
+            const score = await api(sessionApi(zeroSession, "score"));
+            check(score.status === 200 && score.data.status === "insufficient", `score: ${JSON.stringify(score.data)}`);
+            const again = await api(sessionApi(zeroSession, "score"));
+            check(again.data?.status === "insufficient", `repeat: ${JSON.stringify(again.data)}`);
+            check((await aiCalls()).length === callsBefore, "scoring an empty session reached the AI");
+            const page = await pageOf(`/rehearsal/${zeroSession}/scorecard`);
+            const text = flat(page.text);
+            check(page.status === 200 && text.includes("Not enough transcript to score"), "insufficient copy missing");
+            check(
+              !text.includes("had nothing flagged") && !text.includes("Try asking it like this"),
+              "an assessment appeared",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "ending a session spends no scoring call, and a never-scored session shows the scoring state",
+          async () => {
+            // sessionThree has questions with known flaws; the fake flags "would you" and "don't you think".
+            const start = await startRehearsal(rehearsable[2]);
+            sessionThree = sessionIdFrom(start.location);
+            check(sessionThree !== "" && sessionThree !== zeroSession, `fourth start: ${start.location}`);
+            for (const question of [
+              "Would you pay for a left-handed trowel?",
+              "Don't you think left-handed tools are underserved?",
+              "What did you do the last time you bought a trowel?",
+            ]) {
+              const r = await ask(sessionThree, question);
+              check(r.status === 200, `ask: ${r.status}`);
+            }
+            callsBefore = (await aiCalls()).length;
+            const end = await api(sessionApi(sessionThree, "end"));
+            check(end.status === 200, `end: ${end.status}`);
+            const page = await pageOf(`/rehearsal/${sessionThree}/scorecard`);
+            const text = flat(page.text);
+            check(page.status === 200, `page: ${page.status}`);
+            check(text.includes("Scoring your questions. This can take up to 30 seconds"), "scoring state missing");
+            check(
+              !text.includes("Questions to look at again") && !text.includes("Beta scoring"),
+              "a scorecard appeared early",
+            );
+            check(!text.includes("Would you pay"), "the page props or markup carried the founder's questions");
+            check((await aiCalls()).length === callsBefore, "ending or viewing spent a scoring call");
+            const chat = await pageOf(`/rehearsal/${sessionThree}`);
+            check(
+              chat.text.includes(`/rehearsal/${sessionThree}/scorecard`),
+              "no link to the scorecard from the ended chat",
+            );
+            check(chat.text.includes("See your scorecard"), "scorecard call to action missing");
+            const list = await pageOf("/rehearsal");
+            check(list.text.includes(`/rehearsal/${sessionThree}/scorecard`), "no scorecard link in past sessions");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a failed scoring (provider error, junk, viability claim, unknown turn) is saved, leaks nothing and can be retried",
+          async () => {
+            const cases = [
+              ["http500", /couldn.t reach the AI service/],
+              ["garbage", /usable shape/],
+              ["viability", /usable shape/],
+              ["unknown_claim", /usable shape/],
+              ["short", /usable shape/],
+            ];
+            for (const [mode, copy] of cases) {
+              await fake(`/__mode?set=${mode}`);
+              callsBefore = (await aiCalls()).length;
+              const r = await api(sessionApi(sessionThree, "score"));
+              check(r.status === 200 && r.data.status === "failed", `${mode}: ${JSON.stringify(r.data)}`);
+              check(copy.test(r.data.message), `${mode}: message was "${r.data.message}"`);
+              check((await aiCalls()).length > callsBefore, `${mode}: the model was never asked`);
+              const page = await pageOf(`/rehearsal/${sessionThree}/scorecard`);
+              const text = flat(page.text);
+              check(text.includes("We couldn't score this one"), `${mode}: no failed state`);
+              check(copy.test(text), `${mode}: failure copy missing`);
+              check(text.includes("Nothing was lost"), `${mode}: reassurance missing`);
+              check(!/validated|Asks what you would do|wording suggests/.test(text), `${mode}: rejected output leaked`);
+              check(!text.includes("Questions to look at again"), `${mode}: a partial scorecard was shown`);
+            }
+            await fake("/__mode?set=ok");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "after a failure Retry produces the scorecard: disclaimer first, exact quotes, labels, a rewrite, no viability claim",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            const r = await api(sessionApi(sessionThree, "score"));
+            check(r.status === 200 && r.data.status === "ready", `retry: ${JSON.stringify(r.data)}`);
+            const calls = (await aiCalls()).slice(callsBefore);
+            check(
+              calls.length === 1 && calls[0].task === "score" && calls[0].turnsSent === 3,
+              `calls: ${JSON.stringify(calls)}`,
+            );
+            const page = await pageOf(`/rehearsal/${sessionThree}/scorecard`);
+            const text = flat(page.text);
+            check(page.status === 200, `page: ${page.status}`);
+            const disclaimer = text.indexOf("Beta scoring");
+            const summary = text.indexOf("You asked 3 questions");
+            check(disclaimer !== -1 && summary !== -1 && disclaimer < summary, "the disclaimer does not come first");
+            check(text.includes("scores how you ask, never whether your idea will work"), "disclaimer wording changed");
+            check(text.includes("1 of 3 questions had nothing flagged"), "derived count wrong");
+            // Quotes are the stored questions, character for character.
+            check(text.includes("Would you pay for a left-handed trowel?"), "quote one missing");
+            check(text.includes("Don't you think left-handed tools are underserved?"), "quote two missing");
+            check(countOf(page.text, 'data-testid="flagged-question"') === 2, "expected two flagged questions");
+            check(text.includes("Hypothetical") && text.includes("Leading"), "label names missing");
+            check(
+              !text.includes("What did you do the last time you bought a trowel?</blockquote>"),
+              "an unflagged question was flagged",
+            );
+            check(countOf(page.text, 'data-testid="rewrite"') === 1, "expected one rewrite");
+            check(text.includes("Tell me about the last time you bought a gardening tool."), "rewrite missing");
+            check(text.includes("Try asking it like this") && text.includes("Rehearse again"), "next steps missing");
+            check(!/validated|proven/i.test(text), "viability wording appeared");
+            check(!text.includes("Scoring your questions."), "the scoring state is still showing");
+            // Founders keep their own quote exactly even though the page escapes it for HTML.
+            check(!text.includes("score out of") && !/\b\d+\s*\/\s*100\b/.test(text), "a numeric score appeared");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "scoring is idempotent: a repeat costs no AI call and the scorecard does not change",
+          async () => {
+            const before = flat((await pageOf(`/rehearsal/${sessionThree}/scorecard`)).text);
+            callsBefore = (await aiCalls()).length;
+            for (let i = 0; i < 2; i++) {
+              const r = await api(sessionApi(sessionThree, "score"));
+              check(r.status === 200 && r.data.status === "ready", `repeat ${i}: ${JSON.stringify(r.data)}`);
+            }
+            check((await aiCalls()).length === callsBefore, "a repeat score reached the AI");
+            const after = flat((await pageOf(`/rehearsal/${sessionThree}/scorecard`)).text);
+            check(before === after, "the scorecard changed on repeat");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a session with nothing to flag still gets a scorecard with a rewrite and an honest note",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            const r = await api(sessionApi(sessionOne, "score"));
+            check(r.status === 200 && r.data.status === "ready", `score: ${JSON.stringify(r.data)}`);
+            const [call] = (await aiCalls()).slice(callsBefore);
+            check(call.task === "score" && call.turnsSent === 5, `turns sent: ${call?.turnsSent}`);
+            const text = flat((await pageOf(`/rehearsal/${sessionOne}/scorecard`)).text);
+            check(text.includes("5 of 5 questions had nothing flagged"), "count wrong");
+            check(text.includes("Nothing in your questions was clearly flagged"), "no-flags note missing");
+            check(
+              countOf(text, "Try asking it like this") === 1 && text.includes("as you asked it"),
+              "rewrite section missing",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "two parallel scoring requests cost exactly one AI call; the cap-ended session scores all eight questions",
+          async () => {
+            await fetch(`${FAKE_AI_URL}/__mode?set=slow&ms=1500`);
+            callsBefore = (await aiCalls()).length;
+            const [a, b] = await Promise.all([
+              api(sessionApi(sessionTwo, "score")),
+              api(sessionApi(sessionTwo, "score")),
+            ]);
+            await fake("/__mode?set=ok");
+            const statuses = [a.data?.status, b.data?.status].sort();
+            check(statuses.join() === "in_progress,ready", `statuses: ${statuses.join()}`);
+            const calls = (await aiCalls()).slice(callsBefore);
+            check(
+              calls.length === 1 && calls[0].task === "score" && calls[0].turnsSent === 8,
+              `calls: ${JSON.stringify(calls)}`,
+            );
+            const text = flat((await pageOf(`/rehearsal/${sessionTwo}/scorecard`)).text);
+            check(text.includes("8 of 8 questions had nothing flagged"), "cap session count wrong");
+            const list = await pageOf("/rehearsal");
+            check(
+              countOf(list.text, "View scorecard") === 4,
+              `expected 4 scorecard links, saw ${countOf(list.text, "View scorecard")}`,
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
           "through the real database API a founder cannot read or write the hidden persona",
           async () => {
             if (!SUPABASE_URL || !SUPABASE_ANON_KEY)
@@ -1194,6 +1430,55 @@ const steps = [
               body: JSON.stringify({ p_assumption: rehearsable[2], p_scenario: {} }),
             });
             check([401, 403, 404].includes(start.status), `start_rehearsal_session was callable: ${start.status}`);
+            // Scorecards: readable by their owner, writable by nobody but the server.
+            const ownCards = await rest("scorecards?select=session_id,status");
+            check(
+              ownCards.status === 200 && JSON.parse(ownCards.text).some((c) => c.session_id === sessionThree),
+              `own scorecards: ${ownCards.status} ${ownCards.text.slice(0, 80)}`,
+            );
+            const forgedCard = await rest("scorecards", {
+              method: "POST",
+              body: JSON.stringify({ session_id: sessionOne, status: "ready", summary: "Forged" }),
+            });
+            check([401, 403].includes(forgedCard.status), `a scorecard was forged: ${forgedCard.status}`);
+            for (const table of ["scorecards", "scorecard_flags", "scorecard_rewrites"]) {
+              const edit = await rest(`${table}?session_id=eq.${sessionThree}`, {
+                method: "PATCH",
+                body: JSON.stringify({ session_id: sessionThree }),
+              });
+              check([401, 403].includes(edit.status), `${table} was editable: ${edit.status}`);
+              const remove = await rest(`${table}?session_id=eq.${sessionThree}`, { method: "DELETE" });
+              check([401, 403].includes(remove.status), `${table} was deletable: ${remove.status}`);
+            }
+            const forgedFlag = await rest("scorecard_flags", {
+              method: "POST",
+              body: JSON.stringify({
+                session_id: sessionThree,
+                seq: 1,
+                label: "leading",
+                quote: "x",
+                explanation: "x",
+              }),
+            });
+            check([401, 403].includes(forgedFlag.status), `a flag was forged: ${forgedFlag.status}`);
+            const claim = await rest("rpc/claim_scorecard", {
+              method: "POST",
+              body: JSON.stringify({ p_session: sessionOne }),
+            });
+            check([401, 403, 404].includes(claim.status), `claim_scorecard was callable: ${claim.status}`);
+            const store = await rest("rpc/store_scorecard", {
+              method: "POST",
+              body: JSON.stringify({
+                p_session: sessionOne,
+                p_status: "ready",
+                p_summary: "Forged",
+                p_model: null,
+                p_error_kind: null,
+                p_flags: [],
+                p_rewrites: [],
+              }),
+            });
+            check([401, 403, 404].includes(store.status), `store_scorecard was callable: ${store.status}`);
             const page = await pageOf(`/rehearsal/${sessionTwo}`);
             check(countOf(page.text, "You · question") === 8, "the transcript changed through the database API");
             return { status: 200, location: "" };
@@ -1217,7 +1502,11 @@ const steps = [
               check(page.status === 302 && page.location === "/rehearsal", `page: ${page.status} ${page.location}`);
               const own = await request("/rehearsal");
               check(own.status === 302 && own.location === "/project/new", `no project yet: ${own.location}`);
-              for (const action of ["turns", "retry", "end"]) {
+              const card = await request(`/rehearsal/${sessionTwo}/scorecard`);
+              check(card.status === 302 && card.location === "/rehearsal", `scorecard page: ${card.status}`);
+              check(!card.text.includes("Question number"), "the scorecard page leaked a transcript");
+              callsBefore = (await aiCalls()).length;
+              for (const action of ["turns", "retry", "end", "score"]) {
                 const r = await api(sessionApi(sessionTwo, action), { json: { question: "intrusion" } });
                 check(r.status === 404 && r.data?.error === "not_found", `${action}: ${r.status}`);
                 check(
@@ -1225,7 +1514,7 @@ const steps = [
                   `${action} leaked a transcript`,
                 );
               }
-              callsBefore = (await aiCalls()).length;
+              check((await aiCalls()).length === callsBefore, "a stranger's request spent AI");
               const start = await startRehearsal(rehearsable[2]);
               check(start.location === "/rehearsal?startError=assumption_not_found", `start: ${start.location}`);
               check((await aiCalls()).length === callsBefore, "a stranger's start spent AI");
@@ -1234,6 +1523,11 @@ const steps = [
             }
             const mine = await pageOf(`/rehearsal/${sessionTwo}`);
             check(mine.status === 200 && mine.text.includes("Questions used: 8 of 8"), "the owner lost access");
+            const mineCard = await pageOf(`/rehearsal/${sessionTwo}/scorecard`);
+            check(
+              mineCard.status === 200 && flat(mineCard.text).includes("8 of 8 questions"),
+              "the owner lost the scorecard",
+            );
             return { status: 200, location: "" };
           },
           { status: 200 },
@@ -1271,13 +1565,13 @@ const steps = [
               calls.every(
                 (c) =>
                   c.authorised &&
-                  ["draft", "suggest", "scenario", "persona"].includes(c.task) &&
+                  ["draft", "suggest", "scenario", "persona", "score"].includes(c.task) &&
                   c.jsonMode === (c.task !== "persona"),
               ),
               "unexpected call shape",
             );
             check(
-              ["suggest", "scenario", "persona"].every((task) => calls.some((c) => c.task === task)),
+              ["suggest", "scenario", "persona", "score"].every((task) => calls.some((c) => c.task === task)),
               "a task kind was never called",
             );
             return { status: 200, location: "" };

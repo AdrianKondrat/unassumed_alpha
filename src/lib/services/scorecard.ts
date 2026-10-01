@@ -13,7 +13,7 @@
 import { z } from "zod";
 import { NO_VIABILITY_CLAIMS_RULE, extractJson, findForbiddenWording } from "../ai-output.ts";
 import type { AIMessage } from "../ai-request.ts";
-import type { ScoreLabel } from "../../types.ts";
+import type { Scorecard, ScoreLabel } from "../../types.ts";
 
 export const SCORE_LABELS = [
   "leading",
@@ -47,6 +47,14 @@ export const REWRITES_MAX = 3;
 /** Shown on every scorecard (FR-015). */
 export const BETA_DISCLAIMER =
   "Beta scoring. This is early-stage and can miss nuance or flag a good question. It scores how you ask, never whether your idea will work.";
+
+/** What a failed scoring says, by cause. Always reassures that nothing was lost. Shared by the API and the page. */
+export const SCORE_FAILURE_COPY = {
+  timeout: "Scoring took too long this time. Nothing was lost. Try again.",
+  ai_failed: "We couldn't reach the AI service to score your questions. Nothing was lost. Try again in a moment.",
+  invalid_output: "The scoring didn't come back in a usable shape. Nothing was lost. Try again.",
+  server_error: "Something went wrong on our side while scoring. Nothing was lost. Try again.",
+} as const satisfies Record<NonNullable<Scorecard["error_kind"]>, string>;
 
 export interface ScoreTurn {
   seq: number;

@@ -9,6 +9,7 @@ import { z } from "zod";
 import { complete } from "@/lib/ai";
 import { runScoring } from "./scorecard-run";
 import type { ScoreErrorKind } from "./scorecard-run";
+import { SCORE_FAILURE_COPY } from "./scorecard";
 import type { ParsedScore, ScoreTurn } from "./scorecard";
 import { getSession } from "./rehearsals";
 
@@ -25,13 +26,6 @@ const SERVER_ERROR: ScoreResult = {
   ok: false,
   code: "server_error",
   message: "Something went wrong on our side. Try again.",
-};
-
-const FAILURE_COPY: Record<ScoreErrorKind | "server_error", string> = {
-  timeout: "Scoring took too long this time. Nothing was lost. Try again.",
-  ai_failed: "We couldn't reach the AI service to score your questions. Nothing was lost. Try again in a moment.",
-  invalid_output: "The scoring didn't come back in a usable shape. Nothing was lost. Try again.",
-  server_error: "Something went wrong on our side while scoring. Nothing was lost. Try again.",
 };
 
 interface StoreArgs {
@@ -155,12 +149,12 @@ export async function scoreSession(params: {
     // eslint-disable-next-line no-console
     console.error("scorecard attempt failed:", outcome.errorKind, outcome.reasons.join("; "));
     const saved = await store(admin, sessionId, { status: "failed", errorKind: outcome.errorKind });
-    return saved ? { ok: true, status: "failed", message: FAILURE_COPY[outcome.errorKind] } : SERVER_ERROR;
+    return saved ? { ok: true, status: "failed", message: SCORE_FAILURE_COPY[outcome.errorKind] } : SERVER_ERROR;
   } catch (error) {
     // Unexpected: release the lease so the founder can retry straight away instead of waiting 60 s.
     // eslint-disable-next-line no-console
     console.error("scoreSession failed", error instanceof Error ? error.message.slice(0, 80) : "unknown");
     await store(admin, sessionId, { status: "failed", errorKind: "server_error" });
-    return { ok: true, status: "failed", message: FAILURE_COPY.server_error };
+    return { ok: true, status: "failed", message: SCORE_FAILURE_COPY.server_error };
   }
 }

@@ -1,0 +1,149 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { ScorecardStatus } from "@/components/rehearsal/ScorecardStatus";
+import { getAssumptionStatement, getSession } from "@/lib/services/rehearsals";
+import { BETA_DISCLAIMER, LABEL_META, SCORE_FAILURE_COPY } from "@/lib/services/scorecard";
+import { getScorecard } from "@/lib/services/scorecards";
+import { createClient } from "@/lib/supabase";
+import type { ScorecardFlag } from "@/types";
+import { z } from "zod";
+
+const supabase = createClient(Astro.request.headers, Astro.cookies);
+const id = z.uuid().safeParse(Astro.params.id);
+if (!supabase || !id.success) return Astro.redirect("/rehearsal");
+
+// RLS scopes this to the founder's own sessions; anyone else's id is simply not found.
+const session = await getSession(supabase, id.data);
+if (!session) return Astro.redirect("/rehearsal");
+// A session still in progress has nothing to score yet.
+if (session.status !== "ended") return Astro.redirect(`/rehearsal/${session.id}`);
+
+const [scorecard, assumption] = await Promise.all([
+  getScorecard(supabase, session.id),
+  getAssumptionStatement(supabase, session.assumption_id),
+]);
+
+// The island only needs to know whether to start scoring and, for an earlier failure, the static copy to show.
+const failed = scorecard?.status === "failed";
+const failureMessage = failed ? SCORE_FAILURE_COPY[scorecard.error_kind ?? "server_error"] : null;
+
+// Flags arrive ordered by question; group them so each question appears once with all its problems.
+const flagsByQuestion = new Map<number, ScorecardFlag[]>();
+for (const flag of scorecard?.flags ?? []) {
+  flagsByQuestion.set(flag.seq, [...(flagsByQuestion.get(flag.seq) ?? []), flag]);
+}
+const unflagged = scorecard ? scorecard.turns_scored - scorecard.turns_flagged : 0;
+---
+
+<Layout title="Scorecard" current="rehearsal">
+  <div class="mx-auto w-[min(820px,100%-32px)] py-10 sm:py-14">
+    <a href={`/rehearsal/${session.id}`} class="link text-[15px]">
+      View transcript
+    </a>
+    <div class="eyebrow mb-5 mt-6">
+      <i></i> Scorecard
+    </div>
+    <h1 class="disp text-[clamp(1.8rem,4.5vw,2.8rem)]">How you asked your questions</h1>
+
+    <div class="mt-6">
+      <p class="label">The assumption you practised on</p>
+      <p class="text-[17px] font-bold leading-snug">{assumption}</p>
+    </div>
+
+    {scorecard?.status === "ready" ? (
+      <>
+        <p class="notice notice-info mt-6" data-testid="beta-disclaimer">
+          {BETA_DISCLAIMER}
+        </p>
+
+        <section class="mt-8" aria-labelledby="summary-heading">
+          <h2 id="summary-heading" class="slabel mb-4">
+            In short
+          </h2>
+          <p class="max-w-[62ch] text-[18px] leading-relaxed" data-testid="summary">
+            {scorecard.summary}
+          </p>
+          <p class="mono-note mt-4" data-testid="unflagged-line">
+            {unflagged} of {scorecard.turns_scored} {scorecard.turns_scored === 1 ? "question" : "questions"} had
+            nothing flagged.
+          </p>
+        </section>
+
+        <section class="mt-10" aria-labelledby="flags-heading">
+          <h2 id="flags-heading" class="slabel mb-6">
+            Questions to look at again ({flagsByQuestion.size})
+          </h2>
+          {flagsByQuestion.size === 0 ? (
+            <p class="card-flat text-ink-soft p-5">
+              Nothing in your questions was clearly flagged. That doesn't mean they couldn't be sharper, so try the
+              rewrite below.
+            </p>
+          ) : (
+            <ol class="flex flex-col gap-6">
+              {[...flagsByQuestion.entries()].map(([seq, flags]) => (
+                <li class="card-flat p-5 sm:p-6" data-testid="flagged-question">
+                  <p class="label">Question {seq}</p>
+                  <blockquote class="border-ink break-words whitespace-pre-wrap border-l-4 pl-4 text-[17px] font-bold leading-snug">
+                    {flags[0].quote}
+                  </blockquote>
+                  <ul class="mt-4 flex flex-col gap-4">
+                    {flags.map((flag) => (
+                      <li>
+                        <span class="tag tag-yellow">{LABEL_META[flag.label].title}</span>
+                        <p class="mono-note mt-2">{LABEL_META[flag.label].hint}</p>
+                        <p class="mt-1 text-[16px]">{flag.explanation}</p>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+
+        <section class="mt-10" aria-labelledby="rewrites-heading">
+          <h2 id="rewrites-heading" class="slabel mb-6">
+            Try asking it like this
+          </h2>
+          <ul class="flex flex-col gap-6">
+            {scorecard.rewrites.map((rewrite) => (
+              <li class="card p-5 sm:p-6" data-testid="rewrite">
+                <p class="label">Question {rewrite.seq}, as you asked it</p>
+                <p class="text-ink-soft break-words whitespace-pre-wrap">{rewrite.original}</p>
+                <p class="label mt-4">A stronger way to ask</p>
+                <p class="break-words whitespace-pre-wrap text-[17px] font-bold leading-snug">{rewrite.suggestion}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <div class="border-ink mt-10 flex flex-wrap items-center gap-4 border-t pt-6">
+          <a href="/rehearsal" class="btn btn-yellow">
+            Rehearse again
+          </a>
+          <a href={`/rehearsal/${session.id}`} class="link">
+            View transcript
+          </a>
+        </div>
+      </>
+    ) : scorecard?.status === "insufficient" ? (
+      <div class="card mt-8 p-6" data-testid="insufficient">
+        <h2 class="disp text-3xl">Not enough transcript to score</h2>
+        <p class="text-ink-soft mt-3">
+          This session ended before you asked any questions, so there is nothing to assess. Start another rehearsal and
+          ask a few.
+        </p>
+        <a href="/rehearsal" class="btn btn-yellow mt-5">
+          Rehearse again
+        </a>
+      </div>
+    ) : (
+      <div class="mt-8">
+        <ScorecardStatus client:load sessionId={session.id} autoStart={!failed} initialMessage={failureMessage} />
+        <noscript>
+          <p class="notice notice-info mt-4">Scoring needs JavaScript. Turn it on and reload this page.</p>
+        </noscript>
+      </div>
+    )}
+  </div>
+</Layout>

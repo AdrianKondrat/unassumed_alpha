@@ -1,6 +1,6 @@
 # Rehearsal Scorecard (S-06) Implementation Plan
 
-> **IN PROGRESS on `mvp` (updated 2026-10-01, session 3).** Phases 1-3 are built and verified (see "Implementation notes" at the end of Progress); Phase 4 (UI), the fake-provider handler, smoke steps and docs wrap-up remain. Read `context/foundation/handoff.md` section "RESUME HERE: S-06" first: it lists the exact remaining steps and the design decisions already made, some of which deviate from this plan (scoring is triggered by the scorecard page, not the end-session request).
+> **IMPLEMENTED on `mvp` (updated 2026-10-01, session 3).** Phases 1-4 are built and verified; Phase 5 (live latency and wording check against the real model) cannot run in the build sandbox and is left for the user (see "Implementation notes"). Some decisions deviate from the plan below, notably that scoring is triggered by the scorecard page, not the end-session request.
 
 > **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** (1) Real S-05 columns (see its plan): `rehearsal_sessions(id, project_id, assumption_id, status in ('active','ended'), ended_reason in ('user','cap'), created_at, ended_at)` and `rehearsal_turns(session_id, seq 1..8, question, reply, …)`: a founder turn is the `question` of each row and its position is `seq`; there is no `role`/`content`/`position` and no per-session `founder_id` (ownership is via project → workspace). Replace the plan's assumed names. Persona replies are never scored. (2) Writes to sessions/turns/scorecards are service-role only (S-05's `src/lib/supabase-admin.ts`); scorecards follow the same "no client write policies" rule. (3) The `complete()` extension this plan asks for (`timeoutMs`, `retry`) **already exists** from F-02; skip that step. Also use `jsonMode: true`. (4) Wire scoring into S-05's end-session path (manual end and cap auto-end) as the plan says. (5) The Workers Paid plan requirement still needs the founder's confirmation.
 
@@ -300,22 +300,22 @@ No existing data. Column names referencing S-05 tables need reconciliation when 
 
 #### Manual
 
-- [ ] 3.3 Ending a session with a stubbed model produces a ready scorecard
-- [ ] 3.4 Double-clicking Retry does not create duplicate rows or AI calls
+- [x] 3.3 Ending a session with a stubbed model produces a ready scorecard (scoring is page-triggered: smoke ends a session, then scoring it against the fake provider yields `ready`)
+- [x] 3.4 Double-clicking Retry does not create duplicate rows or AI calls (smoke: two parallel `/score` calls cost exactly one AI call; the browser run showed one request per click)
 
 ### Phase 4: Scorecard UI
 
 #### Automated
 
-- [ ] 4.1 Build passes: `npm run build`
-- [ ] 4.2 Lint passes: `npm run lint`
-- [ ] 4.3 Smoke test passes: `npm run smoke`
+- [x] 4.1 Build passes: `npm run build`
+- [x] 4.2 Lint passes: `npm run lint`
+- [x] 4.3 Smoke test passes: `npm run smoke` (102 steps)
 
 #### Manual
 
-- [ ] 4.4 Scorecard renders correctly on desktop and mobile, including long quotes
-- [ ] 4.5 Disclaimer is visible without scrolling past the first flag
-- [ ] 4.6 Retry works and shows progress
+- [x] 4.4 Scorecard renders correctly on desktop and mobile, including long quotes (Chromium at 1280 and 390 px, no horizontal scroll)
+- [x] 4.5 Disclaimer is visible without scrolling past the first flag (rendered before the summary; at y=448 of 844 px on a phone)
+- [x] 4.6 Retry works and shows progress (browser run: auto-start sends one request, a failure is not auto-retried, Try again recovers, a second visitor polls to the finished card)
 
 ### Phase 5: Latency and wording verification
 
@@ -328,7 +328,7 @@ No existing data. Column names referencing S-05 tables need reconciliation when 
 - [ ] 5.2 Leading-question transcript gets sensible flags; a good transcript gets few or none
 - [ ] 5.3 Beta disclaimer and rewrite appear in every ready scorecard
 
-### Implementation notes (phases 1-3 done; 4-5 pending)
+### Implementation notes (phases 1-4 done; 5 needs the real model)
 
 - **Built and verified so far (commit "S-06 part 1")**: `src/lib/services/scorecard.ts` (labels, prompt, zod schema, `parseScore`), `scorecard-run.ts` (attempt loop with injected model and clock), `scorecard-service.ts` (`scoreSession`), `scorecards.ts` (RLS reads), route `POST /api/rehearsal/sessions/[id]/score`, migration `20261001100500_scorecards.sql`, `supabase/tests/scorecards.sql`, `scripts/test-scorecard.mjs` (24 checks, `npm run test:scorecard`, CI step added), types in `src/types.ts`, `not_ended` -> 409 in `rehearsal-http.ts`. Lint, `astro check`, all offline tests, all SQL tests, build and the existing 93 smoke steps pass. The offline module/loop (25 mutations) and the SQL (31 mutations) were mutation-checked; nothing at HTTP or UI level exists yet for scoring.
 - **Deviation: scoring is not run inside the end-session request.** The scorecard page `/rehearsal/[id]/scorecard` triggers it (an island POSTs `/score` on arrival when there is no scorecard, polls on `in_progress`, shows Retry on `failed`). Reasons: ending a session stays instant, the cap-ending 8th reply request does not also wait for scoring, expired sessions (S-07) and sessions ended in another tab are scored the same way, and no AI is spent unless the founder is present.
@@ -337,4 +337,6 @@ No existing data. Column names referencing S-05 tables need reconciliation when 
 - **Quotes are exact twice over**: `parseScore` takes them from the stored turns and `store_scorecard` copies `question` into `quote`/`original` in SQL (the model's text for them is ignored). The viability-wording screen applies only to model-written prose, never to a founder's quoted words. A rewrite that is itself hypothetical or repeats the question fails the attempt.
 - **Lease and state machine** (DB functions, service-role only, execute grants asserted): `claim_scorecard(session)` -> `not_found | not_ended | ready | insufficient | in_progress | claimed` (60 s stale lease, row-locked); `store_scorecard(...)` stores only a claimed attempt, replaces flags/rewrites atomically and requires >= 1 rewrite for `ready`. A failed scorecard can be re-claimed (Retry). Zero turns -> `insufficient`, no AI call.
 - **Budget**: 12 s per attempt, shared 25 s deadline, a second attempt only with >= 6 s left (`scorecard-run.ts`), `complete({ taskKind: "score", jsonMode: true, timeoutMs, retry: false })`.
-- **Still to do** (Phase 4/5 and wrap-up): scorecard page + island, links, fake-provider scoring handler, smoke steps, screenshots, docs. Phase 5 (live latency/wording script against the real model) cannot run in the sandbox (`openrouter.ai` blocked): write `scripts/verify-scorecard-live.mjs` if time allows and leave 5.1-5.3 unticked.
+- **Phase 4 (UI, part 2)**: `src/pages/rehearsal/[id]/scorecard.astro` (RLS reads; redirects to `/rehearsal` when the session is not the founder's and to `/rehearsal/[id]` while it is still active; ready / insufficient render on the server, everything else shows the island), `ScorecardStatus.tsx` + `useScorecardRun.ts`, `SCORE_FAILURE_COPY` moved into `scorecard.ts` so the API and the page share one wording. Links: "See your scorecard" in the ended chat panel (also the ended `/rehearsal/[id]` page) and "View scorecard" per past session on `/rehearsal`.
+- **Verification**: fake-provider `score` handler (flags "would you" as hypothetical and "don't you think" / "wouldn't" as leading; always one past-behaviour rewrite; modes `viability`, `garbage`, `http500`, `short` and `unknown_claim` fail the attempt; records `turnsSent` only). 9 new smoke steps (102 total) incl. the real-PostgREST check that a founder's token can read but not write scorecards, flags, rewrites or call the two functions. Nine app-level mutations were each caught by the intended step: active session served, ownership check removed, viability wording unscreened, empty session reaching the AI, wrong unflagged count, missing links (past list, chat), unknown positions skipped instead of failing, weakened disclaimer. A Chromium script (throwaway, scratchpad) checked the island's auto-start, no auto-retry after failure, Try again, polling on `in_progress`, and 390/1280 px layout.
+- **Still to do (user, needs a machine that can reach openrouter.ai)**: Phase 5. Run a leading-question transcript and a good transcript through the real model and judge the flags; measure latency against the 25 s deadline; confirm no banned wording; the `gpt-4o-mini` slug in `TASK_CONFIG` is unconfirmed.

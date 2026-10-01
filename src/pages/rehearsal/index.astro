@@ -122,9 +122,14 @@ const formatDate = (iso: string) =>
                 {formatDate(session.created_at)} · {session.turn_count}{" "}
                 {session.turn_count === 1 ? "question" : "questions"} · {ENDED_LABEL[session.ended_reason ?? "user"]}
               </p>
-              <a href={`/rehearsal/${session.id}`} class="link mt-1 self-start">
-                View transcript
-              </a>
+              <div class="mt-1 flex flex-wrap items-center gap-x-5 gap-y-2">
+                <a href={`/rehearsal/${session.id}/scorecard`} class="link">
+                  View scorecard
+                </a>
+                <a href={`/rehearsal/${session.id}`} class="link">
+                  View transcript
+                </a>
+              </div>
             </li>
           ))}
         </ul>
