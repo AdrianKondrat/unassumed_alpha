@@ -1,0 +1,24 @@
+---
+import { CANVAS_BLOCKS } from "@/lib/services/canvas-draft";
+import type { SourceClaim } from "@/lib/services/assumptions";
+
+interface Props {
+  sources: SourceClaim[];
+}
+
+const { sources } = Astro.props;
+const labels = new Map(CANVAS_BLOCKS.map((block) => [block.key, block.label]));
+---
+
+{sources.length > 0 && (
+  <ul class="flex flex-col gap-1" aria-label="Canvas claims this comes from">
+    {sources.map((source) => (
+      <li class="text-sm text-ink-soft">
+        <span class="font-mono text-[11px] font-bold tracking-wider uppercase">{labels.get(source.block)}</span>
+        <span aria-hidden="true"> · </span>
+        <span class="sr-only">: </span>
+        {source.text}
+      </li>
+    ))}
+  </ul>
+)}

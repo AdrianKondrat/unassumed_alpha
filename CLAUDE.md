@@ -11,7 +11,7 @@ This file provides guidance to AI Agent when working with code in this repositor
 - `npm run lint:fix` — auto-fix lint issues
 - `npm run format` — Prettier (includes prettier-plugin-astro + prettier-plugin-tailwindcss)
 - `npm run smoke` — dependency-free end-to-end smoke test (`scripts/smoke.mjs`) against a running server: auth (signup, email verification, password reset by following emailed links) and, when `FAKE_AI_URL` is set, the product flow against `scripts/fake-openrouter.mjs` (run it on :4010 and start the app with `OPENROUTER_BASE_URL=http://127.0.0.1:4010/v1`; it has `/__mode`, `/__calls`, `/__reset` controls and each AI slice registers a handler there). Env: `BASE_URL` (default `http://localhost:4321`), `MAIL_URL` (default `http://127.0.0.1:54324`). CI runs it against the production preview with a local Supabase.
-- `npm run test:ai`, `npm run test:auth`, `npm run test:canvas` — offline unit checks for the pure modules (`src/lib/ai-request.ts`, `src/lib/auth.ts`, `src/lib/ai-output.ts` + `src/lib/services/canvas-draft.ts`), run with `node --experimental-strip-types`. Each slice adds its own `test:*` script the same way.
+- `npm run test:ai`, `npm run test:auth`, `npm run test:canvas`, `npm run test:assumptions` — offline unit checks for the pure modules (`src/lib/ai-request.ts`, `src/lib/auth.ts`, `src/lib/ai-output.ts` + `src/lib/services/canvas-draft.ts`, `src/lib/services/assumption-suggest.ts`), run with `node --experimental-strip-types`. Each slice adds its own `test:*` script the same way.
 - SQL assertions: `for f in supabase/tests/*.sql; do psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "$f"; done` against a reset local DB (see `supabase/README.md`).
 
 Pre-commit hooks: husky + lint-staged runs `eslint --fix` on `*.{ts,tsx,astro}` and `prettier --write` on `*.{json,css,md}`.
@@ -43,6 +43,12 @@ Full server-side rendering (`output: "server"` in astro.config.mjs). All pages a
 - Tables `projects` (one per workspace, unique `workspace_id`) and `canvas_claims` (9-block vocabulary, `origin` = `ai_draft | founder`, `revision`). `public.is_project_member(project uuid)` is the RLS helper for everything that hangs off a project; `public.claim_draft_lease(project uuid)` is the atomic in-flight lease (60 s staleness, DB clock). Do **not** build leases as a PostgREST `update` with `or=` + `select`: it fails on PostgREST 12.2.3. Use a function.
 - Pure modules: `src/lib/ai-output.ts` (`extractJson`, `findForbiddenWording`, `NO_VIABILITY_CLAIMS_RULE`; shared by all AI slices) and `src/lib/services/canvas-draft.ts` (blocks, prompt, zod schema, `parseDraft`, `briefSchema`). Orchestration: `canvas-draft-service.ts` (`draftCanvas`), `project.ts` (`getCurrentProject`, `listClaims`, `createProject`).
 - Routes: `POST /api/projects` (save brief first), `POST /api/projects/draft` (redirects to `/project`, `?draftError=<code>` on failure; only known codes are rendered). Pages: `/project/new`, `/project`; components in `src/components/canvas/`. Slow AI forms use `data-pending` + `src/scripts/pending-forms.ts`.
+
+### Assumptions (S-04)
+
+- Table `assumptions` holds pending candidates and durable assumptions, told apart by `status` (`suggested` → `active | rejected`; `active | superseded | retired` move freely; `rejected` is terminal); `assumption_claims` records provenance. Rules are enforced by the `assumptions_guard` trigger (and the routes' conditional updates), so direct API writes cannot bypass the review gate. Rehearsal (S-05) should pick from `status = 'active'` and use the `statement` column.
+- DB functions: `claim_suggest_lease(project)` (lease, like the draft one) and `create_suggested_assumptions(project, items jsonb)` (atomic batch + links). Use `clock_timestamp()` for defaults when row order within one transaction matters.
+- Pure module `src/lib/services/assumption-suggest.ts` (prompt, parser, form schemas, `computeReviewUpdate`, `canReview`/`canSetLifecycle`); orchestration in `assumption-suggest-service.ts`; reads/writes in `assumptions.ts`. Routes: `POST /api/assumptions/suggest`, `POST /api/assumptions/[id]/review` (`accept`/`reject`, absent fields mean keep), `POST /api/assumptions/[id]/status`. Page `/assumptions`, components in `src/components/assumptions/`.
 
 ### UI / brand
 

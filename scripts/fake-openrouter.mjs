@@ -4,7 +4,7 @@
 //   node scripts/fake-openrouter.mjs            (PORT env overrides 4010)
 //
 // Control endpoints (tests drive failure paths with these):
-//   GET  /__mode?set=ok|http500|garbage|viability|slow[&ms=N]   choose how replies behave (default ok)
+//   GET  /__mode?set=ok|http500|garbage|viability|slow|unknown_claim|short[&ms=N]   how replies behave (default ok)
 //   GET  /__calls                                        what was asked: task, model, flags. Never message content.
 //   POST /__reset                                        back to ok mode, clear the call log
 //
@@ -16,6 +16,7 @@ const PORT = Number(process.env.PORT ?? 4010);
 let mode = "ok";
 let slowMs = 20_000;
 let calls = [];
+const ctx = { suggestBatches: 0 };
 
 const CANVAS_KEYS = [
   "customer_segments",
@@ -33,7 +34,7 @@ const CANVAS_KEYS = [
 const HANDLERS = [
   {
     task: "draft",
-    match: (system) => system.includes("Business Model Canvas"),
+    match: (system) => system.includes("first draft of a Business Model Canvas"),
     respond: (messages, replyMode) => {
       const brief = messages.find((m) => m.role === "user")?.content ?? "";
       const topic = brief
@@ -47,6 +48,32 @@ const HANDLERS = [
       );
       if (replyMode === "viability") draft.value_propositions[0] = "This idea is already validated by customers";
       return JSON.stringify(draft);
+    },
+  },
+  {
+    task: "suggest",
+    match: (system) => system.includes("riskiest assumptions"),
+    respond: (messages, replyMode, ctx) => {
+      const user = messages.find((m) => m.role === "user")?.content ?? "";
+      const claimIds = [...user.matchAll(/\[([0-9a-f]{8}-[0-9a-f-]{27})\]/g)].map((m) => m[1]);
+      // Only well-formed replies advance the batch number, so tests can predict the wording of served batches.
+      const served = replyMode === "ok" || replyMode === "slow";
+      const batch = served ? ++ctx.suggestBatches : ctx.suggestBatches + 1;
+      const count = replyMode === "short" ? 3 : 6;
+      const suggestions = Array.from({ length: count }, (_, i) => ({
+        statement: `Batch ${batch} assumption ${i + 1}: customers behave this way`,
+        risk_note: `Batch ${batch} risk ${i + 1}: this could be wrong`,
+        claim_ids: [claimIds[i % claimIds.length], claimIds[(i + 1) % claimIds.length]],
+      }));
+      if (replyMode === "unknown_claim") suggestions[2].claim_ids = ["99999999-9999-9999-9999-999999999999"];
+      if (replyMode === "viability") suggestions[0].statement = "Customers have already proven they will pay";
+      return JSON.stringify({ suggestions });
+    },
+    // How many previously rejected statements the prompt carried (never their text).
+    extra: (messages) => {
+      const user = messages.find((m) => m.role === "user")?.content ?? "";
+      const block = /<rejected>\n([\s\S]*?)\n<\/rejected>/.exec(user)?.[1] ?? "";
+      return { rejectedCount: block.startsWith("-") ? block.split("\n").length : 0 };
     },
   },
 ];
@@ -81,6 +108,7 @@ const server = createServer(async (req, res) => {
   if (url.pathname === "/__reset") {
     mode = "ok";
     slowMs = 20_000;
+    ctx.suggestBatches = 0;
     calls = [];
     return json(res, 200, { mode, calls: 0 });
   }
@@ -101,12 +129,14 @@ const server = createServer(async (req, res) => {
       dataCollection: body.provider?.data_collection ?? null,
       jsonMode: body.response_format?.type === "json_object",
       authorised: (req.headers.authorization ?? "").startsWith("Bearer "),
+      ...(handler?.extra?.(messages) ?? {}),
     });
 
     if (mode === "http500") return json(res, 500, { error: { code: 500, message: "fake provider failure" } });
     if (mode === "slow") await sleep(slowMs);
 
-    const content = mode === "garbage" || !handler ? "Sorry, I can't produce that." : handler.respond(messages, mode);
+    const content =
+      mode === "garbage" || !handler ? "Sorry, I can't produce that." : handler.respond(messages, mode, ctx);
     return json(res, 200, {
       id: "fake-completion",
       model: body.model,

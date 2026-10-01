@@ -13,7 +13,8 @@
     "smoke": "node scripts/smoke.mjs",
     "test:auth": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-auth.mjs",
     "test:ai": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-ai-client.mjs",
-    "test:canvas": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-canvas-draft.mjs"
+    "test:canvas": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-canvas-draft.mjs",
+    "test:assumptions": "node --disable-warning=ExperimentalWarning --experimental-strip-types scripts/test-assumption-suggest.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.10",

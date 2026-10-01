@@ -134,6 +134,14 @@ const BLOCK_LABELS = [
   "Cost structure",
 ];
 let callsBefore = 0;
+let pendingIds = [];
+const reviewPath = (id) => `/api/assumptions/${id}/review`;
+const statusPath = (id) => `/api/assumptions/${id}/status`;
+const idsOn = (html, kind) => [
+  ...new Set([...html.matchAll(new RegExp(`/api/assumptions/([0-9a-f-]{36})/${kind}`, "g"))].map((m) => m[1])),
+];
+const suggest = () => request("/api/assumptions/suggest", { method: "POST" });
+const lastCalls = async (n) => (await aiCalls()).slice(-n);
 
 const steps = [
   ["home renders", () => request("/"), { status: 200 }],
@@ -145,6 +153,22 @@ const steps = [
     { status: 302, location: "/auth/signin" },
   ],
   ["drafting anonymously is refused", post("/api/projects/draft"), { status: 302, location: "/auth/signin" }],
+  [
+    "assumptions page redirects anonymous user",
+    () => request("/assumptions"),
+    { status: 302, location: "/auth/signin" },
+  ],
+  ["suggesting anonymously is refused", post("/api/assumptions/suggest"), { status: 302, location: "/auth/signin" }],
+  [
+    "reviewing anonymously is refused",
+    post("/api/assumptions/11111111-1111-1111-1111-111111111111/review", { action: "accept" }),
+    { status: 302, location: "/auth/signin" },
+  ],
+  [
+    "changing status anonymously is refused",
+    post("/api/assumptions/11111111-1111-1111-1111-111111111111/status", { status: "retired" }),
+    { status: 302, location: "/auth/signin" },
+  ],
   [
     "reset-password page redirects anonymous user",
     () => request("/auth/reset-password"),
@@ -427,6 +451,278 @@ const steps = [
           { status: 200 },
         ],
         [
+          "assumptions page asks for a canvas-backed suggestion",
+          async () => {
+            const r = await request("/assumptions");
+            check(
+              r.text.includes("Suggest assumptions") && !r.text.includes("To review"),
+              "suggest prompt missing or cards present",
+            );
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "dashboard links the assumption stage once the canvas exists",
+          async () => {
+            const r = await request("/dashboard");
+            check(r.text.includes("Open your assumptions"), "assumption link missing");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "suggest: provider failure keeps things safe and offers Retry",
+          async () => {
+            await fake("/__mode?set=http500");
+            const r = await suggest();
+            check(r.location === "/assumptions?suggestError=ai_failed", `redirected to ${r.location}`);
+            const page = await request(r.location);
+            check(page.text.includes("Nothing was lost") && page.text.includes("Try again"), "retry message missing");
+            return { status: page.status, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "suggest: bad output is rejected (garbage, unknown claim, too few, viability wording)",
+          async () => {
+            for (const mode of ["garbage", "unknown_claim", "short", "viability"]) {
+              await fake(`/__mode?set=${mode}`);
+              const r = await suggest();
+              check(r.location === "/assumptions?suggestError=invalid_output", `${mode}: redirected to ${r.location}`);
+            }
+            const page = await request("/assumptions");
+            check(!page.text.includes("To review"), "a rejected batch left pending cards");
+            check(!/proven/i.test(page.text), "forbidden wording reached the page");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "suggest: two parallel requests cost exactly one AI call",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            await fetch(`${FAKE_AI_URL}/__mode?set=slow&ms=1500`);
+            const [a, b] = await Promise.all([suggest(), suggest()]);
+            check(a.status === 302 && b.status === 302, "unexpected status");
+            const used = (await aiCalls()).length - callsBefore;
+            check(used === 1, `expected 1 AI call, saw ${used}`);
+            await fake("/__mode?set=ok");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a batch of 6 pending suggestions appears with sources and the suggest action hides",
+          async () => {
+            const r = await request("/assumptions");
+            pendingIds = idsOn(r.text, "review");
+            check(pendingIds.length === 6, `expected 6 cards, saw ${pendingIds.length}`);
+            check(
+              r.text.includes("To review (6)") && r.text.includes("Keep it") && r.text.includes("Comes from"),
+              "card content missing",
+            );
+            check(!r.text.includes("/api/assumptions/suggest"), "suggest form still offered");
+            check(r.text.includes("not findings"), "honesty note missing");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "suggesting again while pending is a quiet no-op that spends nothing",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            const r = await suggest();
+            check(r.location === "/assumptions", `redirected to ${r.location}`);
+            check((await aiCalls()).length === callsBefore, "AI was called with a pending batch");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "accept as written keeps the wording and is not marked edited",
+          async () => {
+            const r = await request(reviewPath(pendingIds[0]), {
+              method: "POST",
+              form: {
+                action: "accept",
+                statement: "Batch 1 assumption 1: customers behave this way",
+                riskNote: "Batch 1 risk 1: this could be wrong",
+              },
+            });
+            check(r.location === "/assumptions", `redirected to ${r.location}`);
+            const page = await request("/assumptions");
+            check(
+              page.text.includes("Batch 1 assumption 1") && idsOn(page.text, "status").includes(pendingIds[0]),
+              "not in the durable list",
+            );
+            check(!page.text.includes("Edited by you"), "marked edited without an edit");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "edit-then-accept stores the founder's wording and marks it edited",
+          async () => {
+            const r = await request(reviewPath(pendingIds[1]), {
+              method: "POST",
+              form: { action: "accept", statement: "Gardeners will pay 9 pounds a month", riskNote: "" },
+            });
+            check(r.location === "/assumptions", `redirected to ${r.location}`);
+            const page = await request("/assumptions");
+            check(
+              page.text.includes("Gardeners will pay 9 pounds a month") && page.text.includes("Edited by you"),
+              "edit not shown",
+            );
+            check(!page.text.includes("Batch 1 assumption 2"), "original wording still shown");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "reject removes the suggestion from view",
+          async () => {
+            const r = await request(reviewPath(pendingIds[2]), { method: "POST", form: { action: "reject" } });
+            check(r.location === "/assumptions", `redirected to ${r.location}`);
+            const page = await request("/assumptions");
+            check(
+              !page.text.includes("Batch 1 assumption 3") && !idsOn(page.text, "review").includes(pendingIds[2]),
+              "rejected item still listed",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "reviewing the same suggestion twice gives a friendly message",
+          async () => {
+            const r = await request(reviewPath(pendingIds[0]), { method: "POST", form: { action: "reject" } });
+            check(r.location === "/assumptions?reviewError=not_pending", `redirected to ${r.location}`);
+            const page = await request(r.location);
+            check(page.text.includes("already been reviewed"), "friendly message missing");
+            check(page.text.includes("Batch 1 assumption 1"), "an accepted assumption was lost by the replay");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a rejected suggestion cannot be reopened",
+          async () => {
+            const r = await request(reviewPath(pendingIds[2]), { method: "POST", form: { action: "accept" } });
+            check(r.location === "/assumptions?reviewError=not_pending", `redirected to ${r.location}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "an empty or over-long edited statement is refused",
+          async () => {
+            const blank = await request(reviewPath(pendingIds[3]), {
+              method: "POST",
+              form: { action: "accept", statement: "   " },
+            });
+            check(blank.location === "/assumptions?reviewError=invalid", `blank: ${blank.location}`);
+            const long = await request(reviewPath(pendingIds[3]), {
+              method: "POST",
+              form: { action: "accept", statement: "x".repeat(281) },
+            });
+            check(long.location === "/assumptions?reviewError=invalid", `long: ${long.location}`);
+            const page = await request("/assumptions");
+            check(idsOn(page.text, "review").includes(pendingIds[3]), "invalid edit consumed the suggestion");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a malformed or unknown assumption id is handled",
+          async () => {
+            const bad = await request(reviewPath("not-a-uuid"), { method: "POST", form: { action: "accept" } });
+            check(bad.location === "/assumptions?reviewError=not_pending", `bad id: ${bad.location}`);
+            const ghost = await request(reviewPath("22222222-2222-2222-2222-222222222222"), {
+              method: "POST",
+              form: { action: "accept" },
+            });
+            check(ghost.location === "/assumptions?reviewError=not_pending", `ghost: ${ghost.location}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "lifecycle: active -> superseded -> retired -> active, labelled in text",
+          async () => {
+            for (const status of ["superseded", "retired", "active"]) {
+              const r = await request(statusPath(pendingIds[0]), { method: "POST", form: { status } });
+              check(r.location === "/assumptions", `${status}: redirected to ${r.location}`);
+              const page = await request("/assumptions");
+              const label = status[0].toUpperCase() + status.slice(1);
+              check(new RegExp(`Status: </span>${label}`).test(page.text), `${status}: label not shown`);
+            }
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "lifecycle cannot touch pending or rejected rows, or use bad values",
+          async () => {
+            const pending = await request(statusPath(pendingIds[3]), { method: "POST", form: { status: "retired" } });
+            check(pending.location === "/assumptions?statusError=not_durable", `pending: ${pending.location}`);
+            const rejected = await request(statusPath(pendingIds[2]), { method: "POST", form: { status: "active" } });
+            check(rejected.location === "/assumptions?statusError=not_durable", `rejected: ${rejected.location}`);
+            const bad = await request(statusPath(pendingIds[0]), { method: "POST", form: { status: "validated" } });
+            check(bad.location === "/assumptions?statusError=invalid", `bad value: ${bad.location}`);
+            const page = await request("/assumptions");
+            check(idsOn(page.text, "review").includes(pendingIds[3]), "pending row was moved");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "unknown error codes are never echoed",
+          async () => {
+            const r = await request(
+              "/assumptions?suggestError=%3Cscript%3Ealert(1)%3C/script%3E&reviewError=%3Cb%3Ex&statusError=%3Cb%3Ey",
+            );
+            check(
+              !r.text.includes("<script>alert") && !r.text.includes("<b>x") && !r.text.includes("<b>y"),
+              "query string echoed",
+            );
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "suggest more is offered only once every pending item is resolved, and learns from rejections",
+          async () => {
+            let page = await request("/assumptions");
+            check(!page.text.includes("/api/assumptions/suggest"), "suggest offered with pending cards");
+            for (const id of pendingIds.slice(3)) {
+              const r = await request(reviewPath(id), {
+                method: "POST",
+                form: { action: id === pendingIds[3] ? "accept" : "reject" },
+              });
+              check(r.location === "/assumptions", `resolve ${id}: ${r.location}`);
+            }
+            page = await request("/assumptions");
+            check(page.text.includes("Suggest more") && !page.text.includes("To review"), "suggest more missing");
+            callsBefore = (await aiCalls()).length;
+            const r = await suggest();
+            check(r.location === "/assumptions", `redirected to ${r.location}`);
+            const [call] = await lastCalls(1);
+            check((await aiCalls()).length === callsBefore + 1 && call.task === "suggest", "no new suggest call");
+            check(
+              call.rejectedCount >= 3,
+              `prompt carried ${call.rejectedCount} rejected statements, expected at least 3`,
+            );
+            page = await request("/assumptions");
+            check(
+              page.text.includes("Batch 2 assumption 1") && page.text.includes("Batch 1 assumption 1"),
+              "second batch or earlier assumptions missing",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
           "every provider call asked for zero data retention and JSON mode",
           async () => {
             const calls = await aiCalls();
@@ -436,8 +732,12 @@ const steps = [
               "a call lacked data_collection=deny",
             );
             check(
-              calls.every((c) => c.jsonMode && c.authorised && c.task === "draft"),
+              calls.every((c) => c.jsonMode && c.authorised && ["draft", "suggest"].includes(c.task)),
               "unexpected call shape",
+            );
+            check(
+              calls.some((c) => c.task === "suggest"),
+              "no suggest calls recorded",
             );
             return { status: 200, location: "" };
           },

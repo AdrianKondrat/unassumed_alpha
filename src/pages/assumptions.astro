@@ -1,0 +1,128 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AssumptionRow from "@/components/assumptions/AssumptionRow.astro";
+import SuggestionCard from "@/components/assumptions/SuggestionCard.astro";
+import { createClient } from "@/lib/supabase";
+import { listAssumptions } from "@/lib/services/assumptions";
+import { countClaims, getCurrentProject } from "@/lib/services/project";
+
+const supabase = createClient(Astro.request.headers, Astro.cookies);
+const project = supabase ? await getCurrentProject(supabase) : null;
+if (!supabase || !project) return Astro.redirect("/project/new");
+
+const claimCount = await countClaims(supabase, project.id);
+const { pending, durable } = await listAssumptions(supabase, project.id);
+
+// Only known codes are rendered; the query string is never echoed back.
+const params = Astro.url.searchParams;
+const SUGGEST_ERRORS: Record<string, string | undefined> = {
+  ai_failed: "We couldn't get suggestions from the AI just now. Nothing was lost. Try again in a moment.",
+  invalid_output: "The AI's suggestions didn't come back in a usable shape. Nothing was lost. Try again.",
+  no_claims: "Draft your canvas first so there is something to work from.",
+  not_found: "We couldn't find your project. Refresh the page.",
+};
+const REVIEW_ERRORS: Record<string, string | undefined> = {
+  not_pending: "That suggestion has already been reviewed, perhaps in another tab. Here is its current state.",
+  invalid: "That change wasn't saved. Check the wording isn't empty or longer than 280 characters.",
+  failed: "That change wasn't saved. Please try again.",
+};
+const STATUS_ERRORS: Record<string, string | undefined> = {
+  not_durable: "Only assumptions you have kept can change status.",
+  invalid: "Choose Active, Superseded or Retired.",
+  failed: "That change wasn't saved. Please try again.",
+};
+const suggestError = SUGGEST_ERRORS[params.get("suggestError") ?? ""];
+const reviewError = REVIEW_ERRORS[params.get("reviewError") ?? ""];
+const statusError = STATUS_ERRORS[params.get("statusError") ?? ""];
+const actionError = reviewError ?? statusError;
+---
+
+<Layout title="Assumptions" current="assumptions">
+  <div class="mx-auto w-[min(1180px,100%-32px)] py-10 sm:py-14">
+    <div class="eyebrow mb-5">
+      <i></i> Assumption
+    </div>
+    <h1 class="disp text-[clamp(2.2rem,5.5vw,3.8rem)]">Your riskiest guesses</h1>
+    <p class="mt-4 max-w-[62ch] text-ink-soft">
+      An assumption is something your business depends on that you haven't checked. The AI proposes candidates from your
+      canvas. You decide which ones are really yours: keep, reword or reject each one. Nothing counts until you keep it.
+    </p>
+
+    {actionError && (
+      <p role="alert" class="notice notice-error mt-8 max-w-3xl">
+        {actionError}
+      </p>
+    )}
+
+    {claimCount === 0 ? (
+      <section class="card mt-8 max-w-3xl p-6 sm:p-8">
+        <h2 class="disp text-3xl">Draft your canvas first</h2>
+        <p class="mt-3 text-ink-soft">Assumptions are drawn from the claims on your canvas.</p>
+        <a href="/project" class="btn btn-yellow mt-5">
+          Go to your canvas
+        </a>
+      </section>
+    ) : (
+      <>
+        {pending.length > 0 ? (
+          <section class="mt-10" aria-labelledby="pending-heading">
+            <h2 id="pending-heading" class="slabel mb-6">
+              To review ({pending.length})
+            </h2>
+            <p class="notice notice-info mb-6 max-w-3xl">
+              <strong>These are the AI's guesses, not findings.</strong> Keep the ones worth testing with real
+              customers, reword any that are off, and reject the rest. Suggest more once you have reviewed all of these.
+            </p>
+            <ol class="grid gap-6 lg:grid-cols-2">
+              {pending.map((assumption) => (
+                <SuggestionCard assumption={assumption} />
+              ))}
+            </ol>
+          </section>
+        ) : (
+          <section class="card mt-8 max-w-3xl p-6 sm:p-8" aria-labelledby="suggest-heading">
+            <h2 id="suggest-heading" class="disp text-3xl">
+              {durable.length > 0 ? "Suggest more" : "Suggest assumptions"}
+            </h2>
+            <p class="mt-3 text-ink-soft">
+              The AI reads your canvas and proposes five to eight guesses that your plan quietly depends on, riskiest
+              first.
+            </p>
+            {suggestError && (
+              <p role="alert" class="notice notice-error mt-5">
+                {suggestError}
+              </p>
+            )}
+            <form method="POST" action="/api/assumptions/suggest" class="mt-6" data-pending>
+              <div class="flex flex-wrap items-center gap-4">
+                <button type="submit" class="btn btn-yellow">
+                  {suggestError && !params.get("suggestError")?.startsWith("no_") ? "Try again" : "Suggest assumptions"}
+                </button>
+                <p data-pending-status hidden role="status" class="mono-note">
+                  Reading your canvas. This can take up to 30 seconds. Please keep this page open.
+                </p>
+              </div>
+            </form>
+          </section>
+        )}
+
+        {durable.length > 0 && (
+          <section class="mt-12" aria-labelledby="durable-heading">
+            <h2 id="durable-heading" class="slabel mb-6">
+              Your assumptions ({durable.length})
+            </h2>
+            <ul class="grid gap-6 lg:grid-cols-2">
+              {durable.map((assumption) => (
+                <AssumptionRow assumption={assumption} />
+              ))}
+            </ul>
+          </section>
+        )}
+      </>
+    )}
+  </div>
+</Layout>
+
+<script>
+  import "@/scripts/pending-forms";
+</script>

@@ -1,0 +1,55 @@
+---
+import type { AssumptionWithSources } from "@/lib/services/assumptions";
+import { LIFECYCLE_STATUSES } from "@/lib/services/assumption-suggest";
+import SourceClaims from "./SourceClaims.astro";
+
+interface Props {
+  assumption: AssumptionWithSources;
+}
+
+const { assumption } = Astro.props;
+const selectId = `status-${assumption.id}`;
+const current = LIFECYCLE_STATUSES.find((s) => s.value === assumption.status);
+const isActive = assumption.status === "active";
+const isRetired = assumption.status === "retired";
+---
+
+<li class:list={["card-flat p-5", !isActive && "border-dashed bg-paper-alt"]}>
+  <div class="flex flex-wrap items-center gap-2">
+    <span class:list={["tag", isActive && "tag-teal", isRetired && "tag-open"]}>
+      <span class="sr-only">Status: </span>
+      {current?.label ?? assumption.status}
+    </span>
+    {assumption.edited && <span class="tag">Edited by you</span>}
+  </div>
+  <p class:list={["mt-3 text-lg leading-snug font-bold", !isActive && "text-ink-soft"]}>{assumption.statement}</p>
+  {assumption.risk_note && <p class="mt-2 text-ink-soft">{assumption.risk_note}</p>}
+
+  {assumption.sources.length > 0 && (
+    <details class="mt-3">
+      <summary class="cursor-pointer text-sm font-bold">Where this came from</summary>
+      <div class="mt-2">
+        <SourceClaims sources={assumption.sources} />
+      </div>
+    </details>
+  )}
+
+  <form method="POST" action={`/api/assumptions/${assumption.id}/status`} class="mt-4 flex flex-wrap items-end gap-3">
+    <div>
+      <label for={selectId} class="label">
+        Status
+      </label>
+      <select id={selectId} name="status" class="input w-auto min-w-44">
+        {LIFECYCLE_STATUSES.map((s) => (
+          <option value={s.value} selected={s.value === assumption.status}>
+            {s.label}
+          </option>
+        ))}
+      </select>
+    </div>
+    <button type="submit" class="btn btn-ghost btn-sm">
+      Update status
+    </button>
+  </form>
+  <p class="mono-note mt-2">{current?.hint}</p>
+</li>

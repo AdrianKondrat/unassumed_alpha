@@ -1,5 +1,7 @@
 # Assumption Suggestion and Lifecycle Implementation Plan
 
+> **Implemented on `mvp` (2026-10-01).** Deviations from this plan are listed under "Implementation notes" at the end of the Progress section.
+
 ## Overview
 
 A founder requests one batch of 5-8 AI-suggested assumptions derived from their canvas claims, then accepts (optionally editing first) or rejects each one. Accepted assumptions become durable and carry a lifecycle status (`active`, `superseded`, `retired`) the founder can set by hand. This is slice S-04 in `context/foundation/roadmap.md` (PRD FR-009, FR-010, FR-011). The AI proposes candidates only; nothing is durable until the founder acts, which is what keeps "name the risky guess" a human step.
@@ -322,11 +324,11 @@ Pre-launch, no data to migrate. Rollback is dropping `assumption_claims`, then `
 
 #### Automated
 
-- [ ] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
+- [x] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
 - [ ] 1.2 No migration lint errors: `npx supabase db lint`
-- [ ] 1.3 SQL assertions pass: `psql ... -f supabase/tests/assumptions.sql`
-- [ ] 1.4 Type checking passes: `npx astro check`
-- [ ] 1.5 Linting passes: `npm run lint`
+- [x] 1.3 SQL assertions pass: `psql ... -f supabase/tests/assumptions.sql`
+- [x] 1.4 Type checking passes: `npx astro check`
+- [x] 1.5 Linting passes: `npm run lint`
 
 #### Manual
 
@@ -336,46 +338,57 @@ Pre-launch, no data to migrate. Rollback is dropping `assumption_claims`, then `
 
 #### Automated
 
-- [ ] 2.1 Fixture tests pass: `npm run test:assumptions`
-- [ ] 2.2 Type checking passes: `npx astro check`
-- [ ] 2.3 Linting passes: `npm run lint`
-- [ ] 2.4 Build passes: `npm run build`
+- [x] 2.1 Fixture tests pass: `npm run test:assumptions`
+- [x] 2.2 Type checking passes: `npx astro check`
+- [x] 2.3 Linting passes: `npm run lint`
+- [x] 2.4 Build passes: `npm run build`
 
 #### Manual
 
-- [ ] 2.5 Prompt reviewed: assumptions framed as risky guesses, viability wording forbidden, rejected statements excluded
+- [x] 2.5 Prompt reviewed: assumptions framed as risky guesses, viability wording forbidden, rejected statements excluded
 
 ### Phase 3: API routes
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npx astro check`
-- [ ] 3.2 Linting passes: `npm run lint`
-- [ ] 3.3 Build passes: `npm run build`
-- [ ] 3.4 Smoke test still passes: `npm run smoke`
+- [x] 3.1 Type checking passes: `npx astro check`
+- [x] 3.2 Linting passes: `npm run lint`
+- [x] 3.3 Build passes: `npm run build`
+- [x] 3.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
-- [ ] 3.5 Rapid double suggest call yields a single batch
-- [ ] 3.6 Suggest with pending rows yields no new rows and no usage event
-- [ ] 3.7 Double review of one assumption accepts once and shows a friendly message
-- [ ] 3.8 Status change on a suggested or rejected row is refused
-- [ ] 3.9 Invalid API key leaves no new rows and resets `suggest_started_at`
+- [x] 3.5 Rapid double suggest call yields a single batch
+- [x] 3.6 Suggest with pending rows yields no new rows and no usage event
+- [x] 3.7 Double review of one assumption accepts once and shows a friendly message
+- [x] 3.8 Status change on a suggested or rejected row is refused
+- [x] 3.9 Invalid API key leaves no new rows and resets `suggest_started_at` (verified with fake-provider failures: HTTP 500, garbage, unknown claim, too few, viability wording; the next request succeeded, so the lease was released. Not run with a real invalid key)
 
 ### Phase 4: UI
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npx astro check`
-- [ ] 4.2 Linting passes: `npm run lint`
-- [ ] 4.3 Build passes: `npm run build`
-- [ ] 4.4 Smoke test still passes: `npm run smoke`
+- [x] 4.1 Type checking passes: `npx astro check`
+- [x] 4.2 Linting passes: `npm run lint`
+- [x] 4.3 Build passes: `npm run build`
+- [x] 4.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
 - [ ] 4.5 End-to-end: suggest, edit-accept, accept, reject, set statuses on local Supabase with a real key
-- [ ] 4.6 Reload keeps state; new batch only after the previous is resolved; rejected statement does not reappear
-- [ ] 4.7 Forced failure shows message and Retry; retry succeeds after fixing key
-- [ ] 4.8 Second account cannot see the first account's assumptions
-- [ ] 4.9 Status labels perceivable without color; forms keyboard-operable
-- [ ] 4.10 No page copy or AI output uses "validated" or "proven"
+- [x] 4.6 Reload keeps state; new batch only after the previous is resolved; rejected statement does not reappear
+- [x] 4.7 Forced failure shows message and Retry; retry succeeds after fixing key (verified with the fake provider, not a real key)
+- [x] 4.8 Second account cannot see the first account's assumptions
+- [x] 4.9 Status labels perceivable without color; forms keyboard-operable
+- [x] 4.10 No page copy or AI output uses "validated" or "proven"
+
+### Implementation notes (deviations and unverified items)
+
+- **Verification environment.** As for S-02: Docker is unavailable in the build sandbox, so the migration was applied with `scripts/sandbox-stack/stack.sh reset`. `supabase db lint` and the Studio policy view (1.2, 1.6) are not run; CI's `smoke` job runs all SQL assertions on the real Supabase CLI. The real model (4.5) is not exercised (`openrouter.ai` is blocked); everything else ran against `scripts/fake-openrouter.mjs`, which now also serves the suggestion prompt and has `unknown_claim` / `short` failure modes.
+- **Lease is a database function.** `public.claim_suggest_lease(project uuid)` mirrors S-02's `claim_draft_lease` (the plan's conditional PostgREST update with `or=` fails on PostgREST 12.2.3).
+- **Atomic batch insert.** `public.create_suggested_assumptions(project, items jsonb)` (security invoker) inserts assumptions and provenance links in one transaction. This replaces the plan's "mark just-inserted rows rejected if the link insert fails" workaround; a failed batch leaves no rows (asserted in SQL).
+- **Transition rules are enforced by a trigger as well as the app** (`assumptions_guard`): a pending row can only become active or rejected, `rejected` is terminal, durable rows move only among active/superseded/retired, wording and `edited` freeze after review, project/origin are immutable, and `updated_at` is set by the trigger (not the app). The anon key is public, so the database must not rely on the routes for these rules.
+- **Link RLS checks provenance**: `assumption_claims` inserts require the claim to belong to the same project as the assumption (the subquery runs under the caller's RLS, so another founder's claim id is invisible and refused).
+- **Ordering.** `assumptions.created_at` defaults to `clock_timestamp()` (not `now()`), otherwise all rows of a batch share a timestamp and the AI's riskiest-first order is lost. Asserted in SQL (found by the smoke test).
+- **Absent form fields mean "keep".** A review POST without `statement`/`riskNote` keeps the stored values and is not marked edited; only a submitted empty note clears it. `edited` is true only when the text really changed (whitespace-only changes do not count).
+- **Additions beyond the plan.** `SourceClaims.astro`, `countClaims()` in `project.ts`, an "Assumptions" nav item, a "Find your riskiest assumptions" button on the canvas page, a live "Open your assumptions" link on the dashboard, and 25 new smoke steps (anonymous guards, failure modes incl. unknown claim reference and too-few suggestions, parallel-suggest race = one AI call, no spend with a pending batch, accept / edit-accept / reject, replay and reopen refused, invalid edits, bad ids, lifecycle moves and refusals, error-code echo guard, "suggest more" only after resolution with rejected statements fed back into the prompt).

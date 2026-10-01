@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CanvasClaim, Project } from "@/types";
 import { getCurrentWorkspace } from "./workspace";
 
-const PROJECT_COLUMNS = "id, workspace_id, brief, draft_started_at, created_at";
+const PROJECT_COLUMNS = "id, workspace_id, brief, draft_started_at, suggest_started_at, created_at";
 const CLAIM_COLUMNS = "id, project_id, block, position, text, origin, revision, created_at";
 
 /** The founder's one project (RLS scopes the query to their workspace), or null if they have not made it yet. */
@@ -29,6 +29,20 @@ export async function listClaims(supabase: SupabaseClient, projectId: string): P
     return [];
   }
   return data;
+}
+
+/** How many canvas claims the project has (0 until the canvas is drafted). */
+export async function countClaims(supabase: SupabaseClient, projectId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from("canvas_claims")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId);
+  if (error) {
+    // eslint-disable-next-line no-console
+    console.error("countClaims failed", error.code);
+    return 0;
+  }
+  return count ?? 0;
 }
 
 export type CreateProjectResult =

@@ -42,6 +42,12 @@ const draftError = DRAFT_ERRORS[Astro.url.searchParams.get("draftError") ?? ""];
         <div class="mt-8">
           <CanvasBoard claims={claims} />
         </div>
+        <div class="mt-10 flex flex-wrap items-center gap-4">
+          <a href="/assumptions" class="btn btn-yellow">
+            Find your riskiest assumptions
+          </a>
+          <p class="mono-note">Next step: turn these claims into guesses you can test.</p>
+        </div>
       </>
     ) : (
       <section class="card mt-8 max-w-3xl p-6 sm:p-8" aria-labelledby="draft-heading">

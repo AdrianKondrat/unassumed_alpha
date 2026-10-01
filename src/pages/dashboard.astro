@@ -2,12 +2,13 @@
 import Layout from "@/layouts/Layout.astro";
 import { createClient } from "@/lib/supabase";
 import { getCurrentWorkspace } from "@/lib/services/workspace";
-import { getCurrentProject } from "@/lib/services/project";
+import { countClaims, getCurrentProject } from "@/lib/services/project";
 
 const { user } = Astro.locals;
 const supabase = createClient(Astro.request.headers, Astro.cookies);
 const workspace = supabase ? await getCurrentWorkspace(supabase) : null;
 const project = supabase && workspace ? await getCurrentProject(supabase) : null;
+const hasCanvas = supabase && project ? (await countClaims(supabase, project.id)) > 0 : false;
 const passwordChanged = Astro.url.searchParams.get("passwordChanged") === "1";
 
 const stages = [
@@ -18,7 +19,14 @@ const stages = [
     href: project ? "/project" : "/project/new",
     cta: project ? "Open your canvas" : "Start your project",
   },
-  { n: "02", name: "Assumption", body: "Claims become named, testable assumptions." },
+  {
+    n: "02",
+    name: "Assumption",
+    body: "Claims become named, testable assumptions.",
+    href: hasCanvas ? "/assumptions" : undefined,
+    cta: "Open your assumptions",
+    waiting: "Draft your canvas first",
+  },
   { n: "03", name: "Rehearsal", body: "Practise the interview. We score your questions, never your idea." },
 ];
 ---
@@ -64,7 +72,7 @@ const stages = [
                 {s.cta}
               </a>
             ) : (
-              <span class="tag tag-open mt-5">Coming next</span>
+              <span class="tag tag-open mt-5">{s.waiting ?? "Coming next"}</span>
             )}
           </li>
         ))}

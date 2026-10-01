@@ -1,0 +1,58 @@
+---
+import type { AssumptionWithSources } from "@/lib/services/assumptions";
+import { RISK_NOTE_MAX_LENGTH, STATEMENT_MAX_LENGTH } from "@/lib/services/assumption-suggest";
+import SourceClaims from "./SourceClaims.astro";
+
+interface Props {
+  assumption: AssumptionWithSources;
+}
+
+const { assumption } = Astro.props;
+const statementId = `statement-${assumption.id}`;
+const noteId = `note-${assumption.id}`;
+---
+
+<li class="card-flat p-5 sm:p-6">
+  <form method="POST" action={`/api/assumptions/${assumption.id}/review`} class="flex flex-col gap-4">
+    <div>
+      <label for={statementId} class="label">
+        The guess
+      </label>
+      <textarea
+        id={statementId}
+        name="statement"
+        required
+        maxlength={STATEMENT_MAX_LENGTH}
+        rows="2"
+        class="input resize-y"
+      >{assumption.statement}</textarea>
+    </div>
+    <div>
+      <label for={noteId} class="label">
+        Why it is risky
+      </label>
+      <textarea
+        id={noteId}
+        name="riskNote"
+        maxlength={RISK_NOTE_MAX_LENGTH}
+        rows="2"
+        class="input resize-y"
+      >{assumption.risk_note ?? ""}</textarea>
+    </div>
+    {assumption.sources.length > 0 && (
+      <div>
+        <p class="label">Comes from</p>
+        <SourceClaims sources={assumption.sources} />
+      </div>
+    )}
+    <div class="flex flex-wrap items-center gap-3">
+      <button type="submit" name="action" value="accept" class="btn btn-yellow">
+        Keep it
+      </button>
+      <button type="submit" name="action" value="reject" class="btn btn-ghost">
+        Reject
+      </button>
+      <span class="mono-note">Edit the wording first if it's off. Rejecting discards your edits.</span>
+    </div>
+  </form>
+</li>

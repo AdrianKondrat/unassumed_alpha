@@ -33,6 +33,7 @@ export interface Project {
   workspace_id: string;
   brief: string;
   draft_started_at: string | null;
+  suggest_started_at: string | null;
   created_at: string;
 }
 
@@ -45,4 +46,27 @@ export interface CanvasClaim {
   origin: ClaimOrigin;
   revision: number;
   created_at: string;
+}
+
+export type AssumptionStatus = "suggested" | "rejected" | "active" | "superseded" | "retired";
+
+/** The three states a durable (accepted) assumption can be moved between by hand (FR-011). */
+export type DurableAssumptionStatus = "active" | "superseded" | "retired";
+
+export interface Assumption {
+  id: string;
+  project_id: string;
+  statement: string;
+  risk_note: string | null;
+  status: AssumptionStatus;
+  origin: "ai_suggested";
+  /** True when the founder changed the AI's wording while accepting. */
+  edited: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AssumptionClaimLink {
+  assumption_id: string;
+  claim_id: string;
 }
