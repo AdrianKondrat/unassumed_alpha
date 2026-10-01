@@ -199,41 +199,43 @@ None. The environment is pre-launch with no live data. Rollback is re-deploying 
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles. See `references/progress-format.md`.
 
+> Implementation notes: workflow validated with actionlint 1.7.7. Beyond the plan: the deploy job fails fast listing any missing required secret, also sets `OPENROUTER_API_KEY` as a Worker secret (F-02), and optionally runs `supabase db push` (needs `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`) so the hosted schema never lags the code. `SUPABASE_SERVICE_ROLE_KEY` gets added to the deploy secrets when S-05 introduces it. Roadmap status for F-03 is deliberately left until the first real deploy is confirmed.
+
 ### Phase 1: Isolated Worker config
 
 #### Automated
 
-- [ ] 1.1 Production build succeeds: `npm run build`
-- [ ] 1.2 Lint passes: `npm run lint`
-- [ ] 1.3 Wrangler accepts the config (dry run): `npx wrangler deploy --dry-run`
+- [x] 1.1 Production build succeeds: `npm run build`
+- [x] 1.2 Lint passes: `npm run lint`
+- [x] 1.3 Wrangler accepts the config (dry run): `npx wrangler deploy --dry-run`
 
 #### Manual
 
-- [ ] 1.4 The verified deploy command is recorded for use in Phase 2
+- [x] 1.4 The verified deploy command is recorded for use in Phase 2 — verified command: `npx wrangler deploy` from the repo root (the adapter's `.wrangler/deploy/config.json` redirects to `dist/server/wrangler.json`)
 
 ### Phase 2: CI deploy job
 
 #### Automated
 
-- [ ] 2.1 Workflow YAML is valid
-- [ ] 2.2 Prettier formatting passes for the workflow
-- [ ] 2.3 Lint, typecheck and build still pass
+- [x] 2.1 Workflow YAML is valid
+- [x] 2.2 Prettier formatting passes for the workflow
+- [x] 2.3 Lint, typecheck and build still pass
 
 #### Manual
 
-- [ ] 2.4 A push to `master` or a PR does not trigger the `deploy` job
-- [ ] 2.5 A failing `ci` or `smoke` job prevents `deploy` from running
+- [ ] 2.4 A push to `master` or a PR does not trigger the `deploy` job (verify on first push)
+- [ ] 2.5 A failing `ci` or `smoke` job prevents `deploy` from running (verify on first push)
 
 ### Phase 3: Docs, secrets runbook and first deploy
 
 #### Automated
 
-- [ ] 3.1 Formatting passes for README and foundation docs
-- [ ] 3.2 No stale "Pages" deployment-target references remain
+- [x] 3.1 Formatting passes for README and foundation docs
+- [x] 3.2 No stale "Pages" deployment-target references remain
 
 #### Manual
 
-- [ ] 3.3 `mvp` branch exists on GitHub and the four secrets are configured
-- [ ] 3.4 A push to `mvp` runs the full pipeline and the Worker `unassumed-mvp` appears in Cloudflare
-- [ ] 3.5 The deployed workers.dev URL loads the app and the post-deploy check passed
-- [ ] 3.6 The `unassumed_alpha` main-branch landing page and waitlist are unaffected
+- [ ] 3.3 `mvp` branch exists on GitHub and the four secrets are configured (operational, user)
+- [ ] 3.4 A push to `mvp` runs the full pipeline and the Worker `unassumed-mvp` appears in Cloudflare (operational, user)
+- [ ] 3.5 The deployed workers.dev URL loads the app and the post-deploy check passed (operational, user)
+- [ ] 3.6 The `unassumed_alpha` main-branch landing page and waitlist are unaffected (operational, user)
