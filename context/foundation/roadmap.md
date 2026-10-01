@@ -36,7 +36,7 @@ First-time founders tend to ask their prospective customers leading, hypothetica
 | S-02 | ai-drafted-canvas-from-brief               | create the one project from a brief and get an AI-drafted canvas                                              | S-01, F-02    | FR-005, FR-006                 | done   |
 | S-03 | manual-canvas-editing-with-conflict-safety | edit canvas claims manually with edits protected against silent overwrite                                     | S-02          | FR-007, FR-008                 | done   |
 | S-04 | assumption-suggestion-and-lifecycle        | request AI-suggested assumptions, accept/edit/reject them, set lifecycle status                               | S-02, F-02    | FR-009, FR-010, FR-011         | done   |
-| S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | ready  |
+| S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | done   |
 | S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | done   |
 | S-07 | resumable-rehearsal-sessions               | resume a disrupted session without losing or duplicating turns                                                | S-05          | FR-017                         | done   |
 
