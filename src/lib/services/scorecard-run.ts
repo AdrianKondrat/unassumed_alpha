@@ -18,7 +18,7 @@ export type ScoreErrorKind = "timeout" | "ai_failed" | "invalid_output";
 /** What the injected model call reports back (a thin view of AIResult). */
 export type ModelReply =
   | { ok: true; text: string; model: string }
-  | { ok: false; kind: "timeout" | "rate_limited" | "provider_error" | "invalid_response" };
+  | { ok: false; kind: "timeout" | "rate_limited" | "provider_error" | "invalid_response" | "daily_limit" };
 
 export type ScoringOutcome =
   | { ok: true; score: ParsedScore; model: string; attempts: number }
@@ -28,6 +28,8 @@ export type ScoringOutcome =
       attempts: number;
       /** Parser reasons (paths and positions only, never text) for the server log. */
       reasons: string[];
+      /** The founder's daily AI allowance stopped the attempt: nothing else is worth trying until it clears. */
+      dailyLimit?: boolean;
     };
 
 export async function runScoring(params: {
@@ -49,6 +51,8 @@ export async function runScoring(params: {
 
     const reply = await ask(messages, Math.min(SCORE_ATTEMPT_TIMEOUT_MS, Math.max(remaining, 1_000)));
     if (!reply.ok) {
+      if (reply.kind === "daily_limit")
+        return { ok: false, errorKind: "ai_failed", attempts, reasons, dailyLimit: true };
       errorKind = reply.kind === "timeout" ? "timeout" : "ai_failed";
       continue;
     }

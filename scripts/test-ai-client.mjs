@@ -1,11 +1,16 @@
 // Offline checks for the AI call path (F-02). No network, no dependencies.
 // Run: npm run test:ai   (imports the pure module via node --experimental-strip-types)
 import {
+  AI_DAILY_CALL_CAP,
+  AI_DAILY_LIMIT_COPY,
+  AI_DAILY_WINDOW_MS,
   TASK_CONFIG,
   OPENROUTER_URL,
   buildOpenRouterRequest,
   buildUsageRow,
   callOpenRouter,
+  dailyWindowStart,
+  isOverDailyCap,
 } from "../src/lib/ai-request.ts";
 
 const KINDS = ["draft", "suggest", "converse", "score"];
@@ -179,6 +184,27 @@ step("a retry sleeps with the configured backoff", async () => {
     sleepImpl: (ms) => (slept.push(ms), Promise.resolve()),
   });
   assert(slept.length === 1 && slept[0] === 500, "expected one 500ms backoff");
+});
+
+step("the daily cap blocks at the cap and not before, and an unreadable ledger never blocks", () => {
+  assert(AI_DAILY_CALL_CAP === 300, `cap is ${AI_DAILY_CALL_CAP}`);
+  assert(!isOverDailyCap(0) && !isOverDailyCap(AI_DAILY_CALL_CAP - 1), "blocked below the cap");
+  assert(
+    isOverDailyCap(AI_DAILY_CALL_CAP) && isOverDailyCap(AI_DAILY_CALL_CAP + 50),
+    "not blocked at or above the cap",
+  );
+  assert(!isOverDailyCap(null), "an unknown count blocked the founder");
+});
+
+step("the daily window starts exactly 24 hours before now", () => {
+  const now = Date.parse("2026-10-02T12:00:00.000Z");
+  assert(AI_DAILY_WINDOW_MS === 86_400_000, `window is ${AI_DAILY_WINDOW_MS}`);
+  assert(dailyWindowStart(now) === "2026-10-01T12:00:00.000Z", `start ${dailyWindowStart(now)}`);
+});
+
+step("the daily-limit copy says why and when it clears, and never claims a verdict on the idea", () => {
+  assert(/today/i.test(AI_DAILY_LIMIT_COPY) && /24 hours/.test(AI_DAILY_LIMIT_COPY), "copy lost the time frame");
+  assert(!/validated|proven/i.test(AI_DAILY_LIMIT_COPY), "viability wording in the copy");
 });
 
 let failed = 0;

@@ -2,6 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import { CanvasEditor } from "@/components/canvas/CanvasEditor";
 import { createClient } from "@/lib/supabase";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import { CANVAS_BLOCKS, CLAIM_MAX_LENGTH } from "@/lib/services/canvas-draft";
 import { BLOCK_CLAIM_CAP, toPublicClaim } from "@/lib/services/canvas-edit";
 import { getCurrentProject, listClaims } from "@/lib/services/project";
@@ -20,6 +21,7 @@ const initialClaims = claims.map(toPublicClaim);
 
 // Only known codes are rendered; the query string is never echoed back.
 const DRAFT_ERRORS: Record<string, string> = {
+  daily_limit: AI_DAILY_LIMIT_COPY,
   ai_failed: "We couldn't get a draft from the AI just now. Your notes are safe. Try again in a moment.",
   invalid_output: "The AI's draft didn't come back in a usable shape. Your notes are safe. Try again.",
   not_found: "We couldn't find your project. Refresh the page.",

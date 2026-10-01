@@ -341,6 +341,16 @@ step("worst case stays inside the deadline: two slow failures take no longer tha
   );
 });
 
+step("a daily-limit reply stops scoring at once: one attempt, flagged, nothing else tried", async () => {
+  const h = harness([aiError("daily_limit", 50), okReply()]);
+  const outcome = await h.run();
+  assert(!outcome.ok && outcome.dailyLimit === true, `outcome ${JSON.stringify(outcome)}`);
+  assert(outcome.attempts === 1 && h.asked.length === 1, `asked ${h.asked.length} times`);
+  assert(outcome.errorKind === "ai_failed", `stored kind is ${outcome.errorKind}`);
+  const other = await harness([aiError("provider_error", 50), aiError("provider_error", 50)]).run();
+  assert(!other.ok && other.dailyLimit !== true, "an ordinary provider error was flagged as the daily limit");
+});
+
 let failed = 0;
 for (const [name, fn] of steps) {
   try {

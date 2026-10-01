@@ -2,18 +2,20 @@
 // atomic insert, release. Pure logic is in ./assumption-suggest.ts. Founder content is never logged here.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { complete } from "@/lib/ai";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import type { AIErrorKind } from "@/lib/ai-request";
 import { MAX_REJECTED_IN_PROMPT, buildSuggestMessages, parseSuggestions } from "./assumption-suggest";
 import type { PromptClaim } from "./assumption-suggest";
 
 export type SuggestErrorCode =
-  "no_claims" | "pending_batch" | "in_progress" | "not_found" | "ai_failed" | "invalid_output";
+  "no_claims" | "pending_batch" | "in_progress" | "not_found" | "ai_failed" | "invalid_output" | "daily_limit";
 
 export type SuggestResult = { ok: true } | { ok: false; code: SuggestErrorCode; message: string };
 
 const AI_FAILURE_COPY: Record<AIErrorKind, string> = {
   timeout: "The AI took too long to answer. Try again in a moment.",
   rate_limited: "The AI service is busy right now. Try again in a minute.",
+  daily_limit: AI_DAILY_LIMIT_COPY,
   provider_error: "We couldn't reach the AI service. Try again in a moment.",
   invalid_response: "The AI service sent back something unreadable. Try again.",
 };
@@ -128,7 +130,11 @@ export async function suggestAssumptions(params: {
     await releaseLease(supabase, projectId);
     // eslint-disable-next-line no-console
     console.error("assumption suggest AI call failed", ai.error.kind);
-    return { ok: false, code: "ai_failed", message: AI_FAILURE_COPY[ai.error.kind] };
+    return {
+      ok: false,
+      code: ai.error.kind === "daily_limit" ? "daily_limit" : "ai_failed",
+      message: AI_FAILURE_COPY[ai.error.kind],
+    };
   }
 
   const parsed = parseSuggestions(ai.text, new Set(claims.map((claim) => claim.id)));

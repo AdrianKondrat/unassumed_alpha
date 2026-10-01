@@ -5,7 +5,7 @@
 // Never import this from a React island or an Astro page's client script.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { OPENROUTER_API_KEY, OPENROUTER_BASE_URL } from "astro:env/server";
-import { buildUsageRow, callOpenRouter } from "./ai-request.ts";
+import { AI_DAILY_LIMIT_COPY, buildUsageRow, callOpenRouter, dailyWindowStart, isOverDailyCap } from "./ai-request.ts";
 import type { AIMessage, AIResult, AITaskKind } from "./ai-request.ts";
 
 export type { AIMessage, AIResult, AITaskKind, AIUsage } from "./ai-request.ts";
@@ -25,9 +25,30 @@ export interface CompleteParams {
   jsonMode?: boolean;
 }
 
+/** Successful AI calls this founder made in the last 24 h (RLS lets them read their own ledger rows), or null. */
+async function usedToday(supabase: SupabaseClient, founderId: string): Promise<number | null> {
+  const { count, error } = await supabase
+    .from("ai_usage_events")
+    .select("id", { count: "exact", head: true })
+    .eq("founder_id", founderId)
+    .gte("created_at", dailyWindowStart(Date.now()));
+  if (error) {
+    // The cap is a cost backstop: if the ledger cannot be read, do not take the product down with it.
+    // eslint-disable-next-line no-console
+    console.error("ai daily cap check failed", error.code);
+    return null;
+  }
+  return count;
+}
+
 export async function complete(params: CompleteParams): Promise<AIResult> {
   if (!OPENROUTER_API_KEY) {
     return { ok: false, error: { kind: "provider_error", message: "OpenRouter is not configured" } };
+  }
+
+  // Checked before any provider call, so a capped founder costs nothing.
+  if (isOverDailyCap(await usedToday(params.supabase, params.founderId))) {
+    return { ok: false, error: { kind: "daily_limit", message: AI_DAILY_LIMIT_COPY } };
   }
 
   const result = await callOpenRouter({

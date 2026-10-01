@@ -2,6 +2,7 @@
 import Layout from "@/layouts/Layout.astro";
 import AssumptionRow from "@/components/assumptions/AssumptionRow.astro";
 import SuggestionCard from "@/components/assumptions/SuggestionCard.astro";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import { createClient } from "@/lib/supabase";
 import { listAssumptions } from "@/lib/services/assumptions";
 import { countClaims, getCurrentProject } from "@/lib/services/project";
@@ -16,6 +17,7 @@ const { pending, durable } = await listAssumptions(supabase, project.id);
 // Only known codes are rendered; the query string is never echoed back.
 const params = Astro.url.searchParams;
 const SUGGEST_ERRORS: Record<string, string | undefined> = {
+  daily_limit: AI_DAILY_LIMIT_COPY,
   ai_failed: "We couldn't get suggestions from the AI just now. Nothing was lost. Try again in a moment.",
   invalid_output: "The AI's suggestions didn't come back in a usable shape. Nothing was lost. Try again.",
   no_claims: "Draft your canvas first so there is something to work from.",

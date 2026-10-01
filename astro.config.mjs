@@ -9,6 +9,22 @@ import cloudflare from "@astrojs/cloudflare";
 // https://astro.build/config
 export default defineConfig({
   output: "server",
+  security: {
+    // Astro hashes its own inline island/hydration scripts and styles, so no 'unsafe-inline' is needed. Everything
+    // else is same-origin: fonts and images are self-hosted, the browser only ever talks to this origin (Supabase and
+    // OpenRouter are called from the server), and forms only post back here.
+    csp: {
+      directives: [
+        "default-src 'self'",
+        "img-src 'self' data:",
+        "font-src 'self'",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+      ],
+    },
+  },
   integrations: [react(), sitemap()],
   vite: {
     plugins: [tailwindcss()],

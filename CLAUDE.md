@@ -36,7 +36,7 @@ Full server-side rendering (`output: "server"` in astro.config.mjs). All pages a
 
 ### AI call path
 
-- `src/lib/ai.ts` `complete({ taskKind, messages, supabase, founderId, … })` is the only way to call a model: OpenRouter with `provider.data_collection = "deny"` on every request, per-task model/timeout in `src/lib/ai-request.ts` (`TASK_CONFIG`), one retry, typed `AIResult`, one `ai_usage_events` row per success. Founder content and persona details must never be logged or returned to clients.
+- `src/lib/ai.ts` `complete({ taskKind, messages, supabase, founderId, … })` is the only way to call a model: OpenRouter with `provider.data_collection = "deny"` on every request, per-task model/timeout in `src/lib/ai-request.ts` (`TASK_CONFIG`), one retry, typed `AIResult`, one `ai_usage_events` row per success. Before any provider call it checks the founder's last 24 h of ledger rows and refuses with kind `daily_limit` once they reach `AI_DAILY_CALL_CAP` (300, in `ai-request.ts`); every flow maps that to its own code (`daily_limit`, HTTP 429 on the JSON routes) with `AI_DAILY_LIMIT_COPY`, and an unreadable ledger never blocks. Founder content and persona details must never be logged or returned to clients.
 
 ### Project and canvas (S-02)
 
@@ -78,6 +78,11 @@ Full server-side rendering (`output: "server"` in astro.config.mjs). All pages a
 - Pure module `src/lib/services/canvas-edit.ts` (text is one line, 1..280; `expectedRevision` a positive integer; extra body fields stripped; `toPublicClaim` allow-list; `BLOCK_CLAIM_CAP`), service `claims.ts` (`updateClaim` is one conditional UPDATE on `(id, revision)`; zero rows is followed by a read that decides `not_found`, success when the saved text already equals the sent text, or `conflict` with the saved claim; `deleteClaim` is revision-checked and a missing claim counts as deleted; `createClaim`), route plumbing `claims-route.ts`.
 - Routes (JSON only): `POST /api/claims`, `PATCH` and `DELETE /api/claims/[id]` (401 / 400 / 404 / 409 `conflict` with `current` / 409 `block_full` / 415). Islands get `PublicClaim` only (`src/types.ts`).
 - UI: `/project` renders the island `src/components/canvas/CanvasEditor.tsx` (hook `useClaimEditor`, `ClaimItem`, `AddClaim`, `ConflictResolver`); `/project?blank=1` starts an empty canvas for a founder who does not want the AI draft. Never use a real `tag-teal` "You" tag in explanatory copy: the S-02 smoke asserts an AI-only canvas has none.
+
+### Security headers and CSP
+
+- `astro.config.mjs` `security.csp` makes Astro emit a `Content-Security-Policy` header with hashes for its own island/hydration scripts and styles plus `default-src 'self'`, `img-src 'self' data:`, `font-src 'self'`, `connect-src 'self'`, `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`. There is no `unsafe-inline` and no `unsafe-eval`: **never add a `style=` attribute, an inline `<script is:inline>`, a CDN script or font, or a browser-side call to another origin** (Supabase and OpenRouter are server-side). Use Tailwind classes (full literal class names, e.g. `[animation-delay:150ms]`). Verify any UI change with a Chromium pass that listens for `securitypolicyviolation`; a smoke step asserts the header.
+- `src/middleware.ts` adds `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`, HSTS on https, and `no-store` for founder content.
 
 ### UI / brand
 

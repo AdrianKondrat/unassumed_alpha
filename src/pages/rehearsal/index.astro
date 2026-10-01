@@ -4,6 +4,7 @@ import { getCurrentProject } from "@/lib/services/project";
 import { expireIdleSessions } from "@/lib/services/rehearsal-service";
 import { getActiveSession, listRehearsableAssumptions, listSessions } from "@/lib/services/rehearsals";
 import { REHEARSAL_TURN_CAP } from "@/lib/services/rehearsal-persona";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import { createClient } from "@/lib/supabase";
 import { createServiceClient } from "@/lib/supabase-admin";
 
@@ -25,6 +26,7 @@ const past = sessions.filter((session) => session.status === "ended");
 
 // Only known codes are rendered; the query string is never echoed back.
 const START_ERRORS: Record<string, string | undefined> = {
+  daily_limit: AI_DAILY_LIMIT_COPY,
   ai_failed: "We couldn't prepare your practice customer just now. Nothing was lost. Try again in a moment.",
   invalid_output: "Your practice customer didn't come out right. Nothing was lost. Try again.",
   assumption_not_found: "We couldn't find that assumption. Refresh the page.",

@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { complete } from "@/lib/ai";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import { runScoring } from "./scorecard-run";
 import type { ScoreErrorKind } from "./scorecard-run";
 import { SCORE_FAILURE_COPY } from "./scorecard";
@@ -149,7 +150,8 @@ export async function scoreSession(params: {
     // eslint-disable-next-line no-console
     console.error("scorecard attempt failed:", outcome.errorKind, outcome.reasons.join("; "));
     const saved = await store(admin, sessionId, { status: "failed", errorKind: outcome.errorKind });
-    return saved ? { ok: true, status: "failed", message: SCORE_FAILURE_COPY[outcome.errorKind] } : SERVER_ERROR;
+    const message = outcome.dailyLimit ? AI_DAILY_LIMIT_COPY : SCORE_FAILURE_COPY[outcome.errorKind];
+    return saved ? { ok: true, status: "failed", message } : SERVER_ERROR;
   } catch (error) {
     // Unexpected: release the lease so the founder can retry straight away instead of waiting 60 s.
     // eslint-disable-next-line no-console

@@ -15,6 +15,8 @@ export function statusForCode(code: string): number {
     case "nothing_to_retry":
     case "assumption_inactive":
       return 409;
+    case "daily_limit":
+      return 429;
     case "ai_failed":
     case "invalid_output":
       return 502;

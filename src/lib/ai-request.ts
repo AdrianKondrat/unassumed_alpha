@@ -18,7 +18,29 @@ export interface AIUsage {
   totalTokens: number;
 }
 
-export type AIErrorKind = "timeout" | "rate_limited" | "provider_error" | "invalid_response";
+export type AIErrorKind = "timeout" | "rate_limited" | "provider_error" | "invalid_response" | "daily_limit";
+
+/**
+ * Successful AI calls one founder can make in a rolling 24 hours (counted from the usage ledger). A normal
+ * rehearsal costs about a dozen, so this is a cost-protection backstop against loops and abuse, not a quota
+ * anyone should meet. Raise it here when pricing or plans exist.
+ */
+export const AI_DAILY_CALL_CAP = 300;
+export const AI_DAILY_WINDOW_MS = 24 * 60 * 60 * 1000;
+
+/** Shown wherever the daily cap stops a call. Honest about why and when it clears. */
+export const AI_DAILY_LIMIT_COPY =
+  "You've reached today's limit for AI-generated content in this beta. It clears within 24 hours. Nothing you wrote was lost.";
+
+/** ISO start of the rolling window ending at `now` (ms since epoch). */
+export function dailyWindowStart(now: number): string {
+  return new Date(now - AI_DAILY_WINDOW_MS).toISOString();
+}
+
+/** True when the founder has used their allowance. An unknown count (the ledger could not be read) never blocks. */
+export function isOverDailyCap(used: number | null): boolean {
+  return used !== null && used >= AI_DAILY_CALL_CAP;
+}
 
 export type AIResult =
   | { ok: true; text: string; usage: AIUsage; model: string }

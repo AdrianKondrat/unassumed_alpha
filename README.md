@@ -1,220 +1,170 @@
-# 10x Astro Starter
+# Unassumed
 
-![](./public/template.png)
+AI rehearsal for first-time founders. You write notes about your idea, get an AI-drafted Business Model Canvas to argue with, turn it into assumptions you could be wrong about, and then **interview a made-up customer** whose background you cannot see in advance. Afterwards you get a scorecard of **how you asked your questions**: leading, hypothetical, solution-biased, not about the past, too vague, with your exact words quoted and a better way to ask.
 
-A modern, opinionated starter template for building fast, accessible web applications.
+It scores the questions, never the idea. Nothing here says an idea is "validated" or "proven", and the practice customer is invented: what they say is not evidence about your market.
 
-## Tech Stack
+This repository is the MVP app (branch `mvp`). The landing page lives on `main`.
 
-- [Astro](https://astro.build/) v7 - Modern web framework with server-first rendering
-- [React](https://react.dev/) v19 - UI library for interactive components
-- [TypeScript](https://www.typescriptlang.org/) v6 - Type-safe JavaScript
-- [Tailwind CSS](https://tailwindcss.com/) v4 - Utility-first CSS framework
-- [Supabase](https://supabase.com/) - Authentication and backend-as-a-service
-- [Cloudflare Workers](https://workers.cloudflare.com/) - Edge deployment runtime
+## What is built
 
-## Prerequisites
+| Slice | What a founder can do                                                                                                                             |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| S-01  | Sign up with a verified email, reset a password, land in a personal workspace                                                                     |
+| S-02  | Write notes, get an AI-drafted nine-block canvas with every AI claim marked "AI draft"                                                            |
+| S-03  | Edit, add and delete claims by hand; two edits racing from one saved revision give one winner and a side-by-side resolver, never a silent loss    |
+| S-04  | Ask for AI-suggested riskiest assumptions, keep / reword / reject each, set a lifecycle status                                                    |
+| S-05  | Rehearse an assumption against a hidden persona for up to 8 questions; retry a failed reply without losing the question                           |
+| S-06  | Get a scorecard: flagged questions with exact quotes, rewrites, a beta disclaimer, no numeric score                                               |
+| S-07  | Refresh, close the tab or lose the connection mid-session without losing or duplicating a turn; idle sessions expire after 24 h and stay readable |
 
-- Node.js v22.14.0 (as specified in `.nvmrc`)
-- npm (comes with Node.js)
+Roadmap, PRD and per-slice plans are in `context/` (start with `context/foundation/handoff.md`). `CLAUDE.md` describes the architecture and conventions.
 
-## Getting Started
+## Tech stack
 
-1. Clone the repository:
+- [Astro](https://astro.build/) 7 (server-rendered) with [React](https://react.dev/) 19 islands, [Tailwind CSS](https://tailwindcss.com/) 4
+- [Supabase](https://supabase.com/) for auth and Postgres (row-level security on every table)
+- [OpenRouter](https://openrouter.ai/) for all model calls
+- [Cloudflare Workers](https://workers.cloudflare.com/) for hosting (scoring needs the Workers **Paid** plan)
 
-```bash
-git clone https://github.com/przeprogramowani/10x-astro-starter.git
-cd 10x-astro-starter
-```
+## Quick start
 
-2. Install dependencies:
+Needs Node 22.14 (`.nvmrc`) and, for the database, Docker.
 
 ```bash
 npm install
-```
-
-3. Set up Supabase and configure environment variables — see [Supabase Configuration](#supabase-configuration) below.
-
-4. Create a `.dev.vars` file for local Cloudflare dev secrets:
-
-```bash
-cp .env.example .dev.vars
-```
-
-5. Run the development server:
-
-```bash
+cp .env.example .env && cp .env.example .dev.vars   # then fill in the values below
+npx supabase start                                   # applies supabase/migrations, starts auth + a mail catcher
 npm run dev
 ```
 
-## Available Scripts
+`npx supabase start` prints the local API URL and keys. Email confirmation is required: sign-up emails land in the local mail catcher at <http://127.0.0.1:54324>.
 
-- `npm run dev` - Start development server (Cloudflare workerd runtime)
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint with type-checked rules
-- `npm run lint:fix` - Auto-fix ESLint issues
-- `npm run format` - Run Prettier
-- `npm run smoke` - Smoke test the auth flow against a running server (`BASE_URL`, defaults to `http://localhost:4321`)
+### Environment variables
 
-## Project Structure
+All are server-only (declared in `astro.config.mjs`); none reaches the browser.
 
-```md
-.
-├── src/
-│ ├── layouts/ # Astro layouts
-│ ├── pages/ # Astro pages
-│ │ └── api/ # API endpoints
-│ ├── components/ # UI components (Astro & React)
-│ └── assets/ # Static assets
-├── public/ # Public assets
-├── wrangler.jsonc # Cloudflare Workers config
-```
+| Variable                    | Purpose                                                                                                       |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_URL`              | Supabase project URL                                                                                          |
+| `SUPABASE_KEY`              | The `anon` key                                                                                                |
+| `SUPABASE_SERVICE_ROLE_KEY` | The `service_role` key. Used only on the server to read the hidden persona and call service-only DB functions |
+| `OPENROUTER_API_KEY`        | OpenRouter key                                                                                                |
+| `OPENROUTER_BASE_URL`       | Optional. Point the AI path at another OpenRouter-compatible endpoint (the local fake provider, a proxy)      |
 
-## Supabase Configuration
+Never commit these. `.env` and `.dev.vars` are gitignored.
 
-This project uses [Supabase](https://supabase.com/) for authentication. Environment variables are declared via Astro's `astro:env` schema and are treated as **server-only secrets** — they are never exposed to the client.
+### Running without a real model
 
-### First-time setup (local, no cloud project needed)
-
-Requires [Docker](https://www.docker.com/) and ~7 GB RAM.
-
-1. Create your `.env` file:
+`scripts/fake-openrouter.mjs` is a deterministic stand-in for OpenRouter, used by the tests:
 
 ```bash
-cp .env.example .env
+node scripts/fake-openrouter.mjs &                       # listens on :4010
+# in .env / .dev.vars:  OPENROUTER_BASE_URL=http://127.0.0.1:4010/v1
 ```
 
-2. Initialize the local Supabase project (creates a `supabase/` config folder):
+It has failure modes you can switch on (`/__mode?set=http500|garbage|viability|slow|...`). It proves the plumbing, **not** the quality of the real model's output.
+
+## Scripts
+
+| Command                                                                                                                                            | What it does                                                 |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run dev` / `build` / `preview`                                                                                                                | Dev server (workerd), production build, preview of the build |
+| `npm run lint` / `lint:fix` / `format`                                                                                                             | ESLint (type-checked) and Prettier                           |
+| `npx astro check`                                                                                                                                  | Type checking for `.astro` and `.ts`                         |
+| `npm run test:ai`, `test:auth`, `test:canvas`, `test:assumptions`, `test:rehearsal`, `test:scorecard`, `test:rehearsal-resume`, `test:canvas-edit` | Offline unit checks of the pure modules (no network)         |
+| `npm run smoke`                                                                                                                                    | End-to-end smoke test against a running server (see below)   |
+
+SQL assertions (RLS, constraints, triggers, service-only functions) run against a reset local database:
 
 ```bash
-npx supabase init
+for f in supabase/tests/*.sql; do
+  psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "$f" || exit 1
+done
 ```
 
-3. Start the local stack (downloads Docker images on first run):
+### Smoke test
+
+`scripts/smoke.mjs` is dependency-free and drives the real app over HTTP: auth (signup, emailed-link verification, password reset), then the whole product flow against the fake provider (canvas, assumptions, rehearsal, resume, scorecard, editing), including privacy checks through the real PostgREST with a founder's own token.
 
 ```bash
-npx supabase start
+npm run build && npm run preview -- --port 4321 &
+node scripts/fake-openrouter.mjs &
+BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 FAKE_AI_URL=http://127.0.0.1:4010 \
+SUPABASE_URL=<api url> SUPABASE_ANON_KEY=<anon key> \
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres npm run smoke
 ```
 
-4. Copy the credentials printed by the CLI into your `.env` and `.dev.vars`:
+`FAKE_AI_URL` enables the AI-backed steps, `SUPABASE_URL` + `SUPABASE_ANON_KEY` the real-PostgREST privacy checks, and `DATABASE_URL` the steps that age a session or a reply lease with `psql`. Steps whose input is missing are skipped, not failed.
+
+## Project structure
 
 ```
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_KEY=<anon key from CLI output>
+src/
+  pages/            Astro pages and JSON/form API routes (pages/api)
+  components/       Astro components and React islands (hooks in components/hooks)
+  lib/              AI call path, Supabase clients, auth helpers
+  lib/services/     Business logic: pure modules (testable offline) and the services that use them
+  middleware.ts     Session resolution, route protection, security headers
+supabase/
+  migrations/       Schema, RLS, service-only functions
+  tests/            SQL assertion scripts
+  templates/        Email templates (confirmation, recovery)
+scripts/            Smoke test, fake provider, offline tests, sandbox stack
+context/            PRD, roadmap, per-slice plans and the handoff document
 ```
 
-5. To stop the stack when done:
+## Privacy and safety by design
 
-```bash
-npx supabase stop
-```
-
-The local Studio UI is available at `http://localhost:54323`.
-
-No database tables or migrations are required — this project uses Supabase Auth's built-in `auth.users` table only.
-
-### Using a cloud Supabase project instead
-
-If you prefer to use a hosted Supabase project, add these variables to your `.env` and `.dev.vars` files:
-
-| Variable       | Description                                                |
-| -------------- | ---------------------------------------------------------- |
-| `SUPABASE_URL` | Project URL from Supabase dashboard → Settings → API       |
-| `SUPABASE_KEY` | `anon` public key from Supabase dashboard → Settings → API |
-
-```
-SUPABASE_URL=https://<project-ref>.supabase.co
-SUPABASE_KEY=<anon-key>
-```
-
-### Email verification in local development
-
-Email confirmation is **required** (`enable_confirmations = true` in `supabase/config.toml`). Local emails are caught by the Supabase CLI's mail server (Mailpit), at `http://127.0.0.1:54324`: open it to click the verification or password-reset link. `npm run smoke` reads the same inbox, so it needs the stack started **with** the mail server.
-
-### Auth routes
-
-| Route                                           | Description                                                 |
-| ----------------------------------------------- | ----------------------------------------------------------- |
-| `/auth/signin`                                  | Email/password sign-in form                                 |
-| `/auth/signup`                                  | Email/password sign-up form                                 |
-| `/auth/confirm-email`                           | "Check your inbox" page with a resend form                  |
-| `/auth/callback`                                | Emailed-link landing: verifies the link, starts the session |
-| `/auth/forgot-password`, `/auth/reset-password` | Self-serve password recovery                                |
-| `/dashboard`                                    | Signed-in home, shows the founder's workspace               |
-
-Route protection is handled in `src/middleware.ts`. Add paths to the `PROTECTED_ROUTES` array there to require authentication.
+- **Zero retention.** Every model request carries `provider.data_collection = "deny"`; founder content and persona text are never logged or returned to other clients.
+- **The hidden persona cannot be read by any client.** Its table has RLS on, no policies and no client privileges; only server-side service-role code touches it, after an RLS read proved ownership.
+- **Database-enforced rules.** Review gates, the turn cap, revision bumps, leases and idle expiry live in triggers and service-only functions, because the anon key is public and a founder can call PostgREST directly.
+- **Content-Security-Policy** (Astro-generated, with hashes for its own inline scripts; no `unsafe-inline`, same-origin only), `X-Frame-Options: DENY`, `no-store` on founder content.
+- **Cost backstop.** `complete()` refuses further calls once a founder has made 300 successful AI calls in a rolling 24 hours (counted from `ai_usage_events`); every flow explains this plainly.
 
 ## Deployment
 
-This project deploys to [Cloudflare Workers](https://workers.cloudflare.com/).
+Pushing to `mvp` runs CI and, once the secrets below exist, deploys the Cloudflare Worker `unassumed-mvp` (a different Worker from the landing page). Pushes to other branches never deploy.
 
-1. Build the project:
+### CI
 
-```bash
-npm run build
-```
+`.github/workflows/ci.yml`:
 
-2. Deploy with Wrangler:
-
-```bash
-npx wrangler deploy
-```
-
-Set `SUPABASE_URL` and `SUPABASE_KEY` as secrets in your Cloudflare dashboard or via `npx wrangler secret put`.
-
-## Smoke test
-
-`scripts/smoke.mjs` is a dependency-free Node script that walks the whole auth flow (sign-up, sign-in, protected page, sign-out) over HTTP. Run it against the dev server or the production preview after dependency upgrades:
-
-```bash
-npm run dev            # or: npm run build && npm run preview
-BASE_URL=http://localhost:4321 npm run smoke
-```
-
-It needs a reachable Supabase instance (local or cloud) with email confirmation disabled.
-
-> **Note:** this script exists primarily to guard the development of the starter itself — it is a fast sanity check that dependency upgrades did not break the build, the Cloudflare adapter or the Supabase auth flow. It is **not** a substitute for a real test suite. Once you build your own product on top of this starter, add proper tests (unit, integration, end-to-end) suited to your application.
-
-## CI
-
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to `master` and `mvp`:
-
-- **ci** — lint, `astro check`, `npm run test:ai` and build. Configure `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `OPENROUTER_API_KEY` as repository secrets for the build step.
-- **smoke** — starts a local Supabase via the Supabase CLI, builds, serves the production preview on the Cloudflare runtime and runs `npm run smoke` against it. No secrets required.
-- **deploy** — only on a push to `mvp`, and only after `ci` and `smoke` pass. See [MVP deploy](#mvp-deploy).
-
-## MVP deploy
-
-Pushing to the `mvp` branch deploys the app as the Cloudflare Worker **`unassumed-mvp`** (reachable on its `workers.dev` URL). It is a separate Worker from the `unassumed_alpha` main-branch landing page and waitlist, which this pipeline never touches. Pushes to any other branch never deploy.
+- **ci**: lint, `astro check`, every offline test, build.
+- **smoke**: local Supabase via the CLI (pinned version), SQL assertions, build, then the smoke test against the production preview with the fake provider and `DATABASE_URL`. No secrets needed.
+- **deploy**: only on a push to `mvp`, after `ci` and `smoke`. Fails fast listing any missing secret.
 
 ### One-time setup
 
-1. **Hosted Supabase project** for the MVP. In the dashboard:
+1. **Hosted Supabase project.** In the dashboard:
    - Authentication → URL Configuration: set _Site URL_ to the deployed Worker URL and add `<worker url>/auth/callback` to _Redirect URLs_.
-   - Authentication → Providers → Email: keep _Confirm email_ **on** (verification is required, FR-001) and set the minimum password length to 8.
-   - Authentication → Emails → Templates: paste `supabase/templates/confirmation.html` into _Confirm sign up_ and `supabase/templates/recovery.html` into _Reset password_ (subjects: "Confirm your email address" / "Reset your password"). These link straight to `/auth/callback?token_hash=…`, so verification works when the email is opened on a different browser or phone.
-   - Authentication → SMTP: configure a real SMTP provider (the built-in mailer is heavily rate-limited and only sends to team members).
+   - Authentication → Providers → Email: keep _Confirm email_ **on** (verification is required) and set the minimum password length to 8.
+   - Authentication → Emails → Templates: paste `supabase/templates/confirmation.html` into _Confirm sign up_ and `supabase/templates/recovery.html` into _Reset password_ (subjects "Confirm your email address" / "Reset your password"). They link to `/auth/callback?token_hash=…`, so verification works when the email is opened on another device.
+   - Authentication → SMTP: configure a real provider (the built-in mailer is heavily rate-limited).
+   - Apply the migrations in `supabase/migrations` (the deploy job can do it: see the optional secrets).
 2. **GitHub repository secrets** (Settings → Secrets and variables → Actions):
 
-   | Secret                         | Purpose                                                                                                                   |
-   | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-   | `CLOUDFLARE_API_TOKEN`         | API token with _Workers Scripts: Edit_ and _Workers KV Storage: Edit_ (the Astro adapter binds a `SESSION` KV namespace). |
-   | `CLOUDFLARE_ACCOUNT_ID`        | Your Cloudflare account id.                                                                                               |
-   | `SUPABASE_URL`, `SUPABASE_KEY` | Hosted MVP project URL and `anon` key (also set as Worker runtime secrets by the deploy job).                             |
+   | Secret                                                                         | Purpose                                                                                                               |
+   | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+   | `CLOUDFLARE_API_TOKEN`                                                         | Token with _Workers Scripts: Edit_ and _Workers KV Storage: Edit_ (the Astro adapter binds a `SESSION` KV namespace). |
+   | `CLOUDFLARE_ACCOUNT_ID`                                                        | Your Cloudflare account id.                                                                                           |
+   | `SUPABASE_URL`, `SUPABASE_KEY`                                                 | Hosted project URL and `anon` key (also set as Worker runtime secrets by the deploy job).                             |
+   | `SUPABASE_SERVICE_ROLE_KEY`                                                    | Hosted `service_role` key. Server-only. Never expose it to the browser.                                               |
+   | `OPENROUTER_API_KEY`                                                           | OpenRouter key for all AI calls (also set as a Worker runtime secret).                                                |
+   | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` (opt.) | When all three exist, the deploy job runs `supabase db push` first so the schema never lags the code.                 |
 
-| `SUPABASE_SERVICE_ROLE_KEY` | Hosted project `service_role` key (Settings → API). Server-only: reads the hidden rehearsal persona. Never put it in the browser. |
-| `OPENROUTER_API_KEY` | OpenRouter key for all AI calls (also set as a Worker runtime secret). |
-| `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` (opt.) | When all three exist, the deploy job runs `supabase db push` before deploying so the schema never lags the code. |
+3. Confirm the Cloudflare account is on the **Workers Paid** plan (see `context/changes/rehearsal-scorecard/research.md`: scoring runs synchronously for up to about 25 s).
+4. Push to `mvp`.
 
-The deploy job fails fast with the list of any missing required secret.
+A deploy runs lint, type check, offline checks, build and the smoke test, optionally `supabase db push`, then `wrangler deploy` and an HTTP 200 check. Deploys are serialised. Roll back with `npx wrangler rollback` or by re-deploying an earlier commit.
 
-3. Make sure the `mvp` branch exists on GitHub, then push to it.
+## Known limits (be honest with yourself before launch)
 
-### What a deploy does
+- **Nothing has been run against the real model.** Every AI path is verified against the fake provider. Prompt quality (canvas draft, assumption suggestion, persona realism, scoring flags), the `openai/gpt-4o-mini` model slug in `src/lib/ai-request.ts` and real latency against the 25 s scoring deadline all need one hands-on pass with a live key.
+- Scoring quality is labelled **beta** in the product on purpose.
+- `npx supabase db lint` (needs Docker) has not been run.
+- Rate limiting beyond the per-founder daily AI cap, and observability, are not built.
 
-lint, type check, offline AI checks, build, local-Supabase smoke test → (optional) `supabase db push` → `npm run build` → `wrangler deploy` (config generated by the Astro Cloudflare adapter under `dist/server`) → HTTP 200 check against the deployed URL. Deploys are serialised (`concurrency: deploy-mvp`). Roll back with `npx wrangler rollback` or by re-deploying an earlier commit.
+## Licence
 
-## License
-
-MIT
+No licence file is included, so all rights are reserved by default. Choose a licence deliberately before making this repository public or accepting outside contributions.

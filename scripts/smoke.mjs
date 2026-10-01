@@ -287,6 +287,24 @@ function accessTokenFromJar() {
 const steps = [
   ["home renders", () => request("/"), { status: 200 }],
   ["dashboard redirects anonymous user", () => request("/dashboard"), { status: 302, location: "/auth/signin" }],
+  [
+    "pages carry a Content-Security-Policy that allows no inline script or foreign origins",
+    async () => {
+      const response = await fetch(`${BASE_URL}/auth/signin`);
+      const csp = response.headers.get("content-security-policy") ?? "";
+      check(csp.includes("default-src 'self'"), `no default-src 'self': ${csp.slice(0, 80)}`);
+      check(/script-src[^;]*'sha256-/.test(csp), "no hashed script-src (Astro's island scripts are not allow-listed)");
+      check(!/unsafe-inline|unsafe-eval/.test(csp), "the policy allows unsafe-inline or unsafe-eval");
+      check(
+        /connect-src 'self'/.test(csp) && /object-src 'none'/.test(csp) && /form-action 'self'/.test(csp),
+        "directives missing",
+      );
+      check(response.headers.get("x-frame-options") === "DENY", "X-Frame-Options missing");
+      await response.text();
+      return { status: 200, location: "" };
+    },
+    { status: 200 },
+  ],
   ["project page redirects anonymous user", () => request("/project"), { status: 302, location: "/auth/signin" }],
   [
     "creating a project anonymously is refused",
@@ -2080,6 +2098,110 @@ const steps = [
               page.text.includes("Treat this as a first draft"),
               "the AI-draft notice is gone while AI claims remain",
             );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the daily AI cap refuses every AI path before the provider is called, tells the founder why, and clears with the ledger",
+          async () => {
+            if (!DATABASE_URL) return { status: 200, location: "(skipped: set DATABASE_URL)" };
+            const founderId = db(`select id from auth.users where email = '${email}'`);
+            check(/^[0-9a-f-]{36}$/.test(founderId), `founder id: ${founderId}`);
+            // The founder already has real ledger rows from this run, so fill up to exactly the cap (300), not past it.
+            const used = () =>
+              Number(
+                db(
+                  `select count(*) from public.ai_usage_events where founder_id = '${founderId}' and created_at > now() - interval '24 hours'`,
+                ),
+              );
+            const fill = (target) =>
+              db(
+                `insert into public.ai_usage_events (founder_id, task_kind, model, prompt_tokens, completion_tokens, total_tokens) select '${founderId}', 'converse', 'smoke-cap-fill', 1, 1, 2 from generate_series(1, ${target - used()})`,
+              );
+            const clear = () => db(`delete from public.ai_usage_events where model = 'smoke-cap-fill'`);
+
+            // An active session to ask in (the cap is not on yet, so the scenario is generated).
+            const start = await startRehearsal(rehearsable[0]);
+            const capSession = sessionIdFrom(start.location);
+            check(capSession !== "", `start: ${start.location}`);
+            try {
+              // Usage older than 24 hours does not count: a full ledger from 30 hours ago leaves the founder uncapped.
+              db(
+                `insert into public.ai_usage_events (founder_id, task_kind, model, prompt_tokens, completion_tokens, total_tokens, created_at) select '${founderId}', 'converse', 'smoke-cap-fill', 1, 1, 2, now() - interval '30 hours' from generate_series(1, 400)`,
+              );
+              const aged = await ask(capSession, "A question with only old usage on the ledger");
+              check(
+                aged.status === 200 && aged.data.turn.reply?.startsWith("Answer 1:"),
+                `aged ledger: ${aged.status} ${aged.text.slice(0, 80)}`,
+              );
+              clear();
+
+              fill(300);
+              check(used() === 300, `ledger holds ${used()}`);
+              callsBefore = (await aiCalls()).length;
+
+              const asked = await ask(capSession, "A question while capped");
+              check(
+                asked.status === 429 && asked.data.error === "daily_limit",
+                `ask: ${asked.status} ${asked.text.slice(0, 100)}`,
+              );
+              check(
+                /today's limit/.test(asked.data.message) && /24 hours/.test(asked.data.message),
+                "ask: the message does not explain the limit",
+              );
+              check(
+                asked.data.turn?.seq === 2 && asked.data.turn.reply === null,
+                "ask: the question was not kept for later",
+              );
+              const retry = await api(sessionApi(capSession, "retry"));
+              check(retry.status === 429 && retry.data.error === "daily_limit", `retry: ${retry.status}`);
+              const score = await api(sessionApi(sessionFour, "score"));
+              check(
+                score.status === 200 && score.data.status === "failed" && /today's limit/.test(score.data.message),
+                `score: ${JSON.stringify(score.data)}`,
+              );
+              check((await aiCalls()).length === callsBefore, "a capped founder reached the provider");
+
+              // Starting a new session needs a scenario, which is AI: refused with the same honest copy.
+              check((await api(sessionApi(capSession, "end"))).status === 200, "ending the capped session failed");
+              const refused = await startRehearsal(rehearsable[1]);
+              check(
+                refused.location === "/rehearsal?startError=daily_limit",
+                `start while capped: ${refused.location}`,
+              );
+              const list = await pageOf("/rehearsal?startError=daily_limit");
+              check(
+                flat(list.text).includes("today's limit for AI-generated content"),
+                "the start page does not explain the limit",
+              );
+              check((await aiCalls()).length === callsBefore, "a capped start reached the provider");
+
+              // One call below the cap still works: the ledger is the only counter.
+              db(
+                `delete from public.ai_usage_events where ctid in (select ctid from public.ai_usage_events where model = 'smoke-cap-fill' limit 1)`,
+              );
+              check(used() === 299, `ledger holds ${used()}`);
+              const ok = await startRehearsal(rehearsable[1]);
+              check(sessionIdFrom(ok.location) !== "", `start at 299: ${ok.location}`);
+              const okSession = sessionIdFrom(ok.location);
+              check((await api(sessionApi(okSession, "end"))).status === 200, "ending the second session failed");
+
+              // Clearing the ledger restores everything.
+              clear();
+              const resumed = await api(sessionApi(capSession, "score"));
+              check(
+                resumed.status === 200 && ["ready", "insufficient", "failed"].includes(resumed.data.status),
+                `score after: ${resumed.status}`,
+              );
+              const recovered = await api(sessionApi(sessionFour, "score"));
+              check(
+                recovered.status === 200 && recovered.data.status === "ready",
+                `score after clearing: ${JSON.stringify(recovered.data)}`,
+              );
+            } finally {
+              clear();
+            }
             return { status: 200, location: "" };
           },
           { status: 200 },

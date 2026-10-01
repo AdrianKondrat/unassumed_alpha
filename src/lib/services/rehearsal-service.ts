@@ -10,6 +10,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { complete } from "@/lib/ai";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import type { AIErrorKind } from "@/lib/ai-request";
 import type { RehearsalSession, RehearsalTurn } from "@/types";
 import {
@@ -32,6 +33,7 @@ const SCENARIO_TIMEOUT_MS = 20_000;
 const AI_FAILURE_COPY: Record<AIErrorKind, string> = {
   timeout: "The AI took too long to answer. Try again in a moment.",
   rate_limited: "The AI service is busy right now. Try again in a minute.",
+  daily_limit: AI_DAILY_LIMIT_COPY,
   provider_error: "We couldn't reach the AI service. Try again in a moment.",
   invalid_response: "The AI service sent back something unreadable. Try again.",
 };
@@ -42,7 +44,7 @@ const SERVER_ERROR_COPY = "Something went wrong on our side. Try again.";
 // Start
 // ---------------------------------------------------------------------------------------------
 export type StartErrorCode =
-  "assumption_not_found" | "assumption_inactive" | "ai_failed" | "invalid_output" | "server_error";
+  "assumption_not_found" | "assumption_inactive" | "ai_failed" | "invalid_output" | "daily_limit" | "server_error";
 
 export type StartResult =
   { ok: true; sessionId: string; existing: boolean } | { ok: false; code: StartErrorCode; message: string };
@@ -96,7 +98,7 @@ export async function startSession(params: {
   if (!ai.ok) {
     // eslint-disable-next-line no-console
     console.error("rehearsal scenario AI call failed", ai.error.kind);
-    return startFailure("ai_failed", AI_FAILURE_COPY[ai.error.kind]);
+    return startFailure(ai.error.kind === "daily_limit" ? "daily_limit" : "ai_failed", AI_FAILURE_COPY[ai.error.kind]);
   }
 
   const parsed = parseScenario(ai.text);
@@ -168,6 +170,7 @@ export type TurnErrorCode =
   | "nothing_to_retry"
   | "ai_failed"
   | "invalid_output"
+  | "daily_limit"
   | "server_error";
 
 export type TurnResult =
@@ -176,7 +179,10 @@ export type TurnResult =
   /** `turn` is present when the question was saved but no reply could be produced (the UI shows Retry). */
   | { ok: false; code: TurnErrorCode; message: string; turn?: RehearsalTurn };
 
-const TURN_COPY: Record<Exclude<TurnErrorCode, "ai_failed" | "invalid_output" | "server_error">, string> = {
+const TURN_COPY: Record<
+  Exclude<TurnErrorCode, "ai_failed" | "invalid_output" | "daily_limit" | "server_error">,
+  string
+> = {
   not_found: "We couldn't find that session.",
   not_active: "This session has ended.",
   reply_pending: "Wait for the reply to your last question first.",
@@ -245,7 +251,11 @@ async function generateReply(params: {
   if (!ai.ok) {
     // eslint-disable-next-line no-console
     console.error("rehearsal reply AI call failed", ai.error.kind);
-    return turnFailure("ai_failed", AI_FAILURE_COPY[ai.error.kind], unanswered);
+    return turnFailure(
+      ai.error.kind === "daily_limit" ? "daily_limit" : "ai_failed",
+      AI_FAILURE_COPY[ai.error.kind],
+      unanswered,
+    );
   }
 
   const guarded = guardReply(ai.text);

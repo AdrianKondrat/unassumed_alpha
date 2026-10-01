@@ -1,4 +1,14 @@
 import { useScorecardRun } from "@/components/hooks/useScorecardRun";
+import { cn } from "@/lib/utils";
+
+// Full class names (not computed) so Tailwind sees them; a style attribute would need CSP 'unsafe-inline'.
+const PULSE_DELAY = [
+  "[animation-delay:0ms]",
+  "[animation-delay:150ms]",
+  "[animation-delay:300ms]",
+  "[animation-delay:450ms]",
+  "[animation-delay:600ms]",
+];
 
 interface ScorecardStatusProps {
   sessionId: string;
@@ -45,11 +55,7 @@ export function ScorecardStatus(props: ScorecardStatusProps) {
       </p>
       <span aria-hidden="true" className="mt-5 flex gap-1">
         {Array.from({ length: 5 }, (_, i) => (
-          <span
-            key={i}
-            className="border-ink bg-yellow size-3 animate-pulse border-2"
-            style={{ animationDelay: `${i * 150}ms` }}
-          />
+          <span key={i} className={cn("border-ink bg-yellow size-3 animate-pulse border-2", PULSE_DELAY[i])} />
         ))}
       </span>
     </div>

@@ -2,16 +2,19 @@
 // Pure logic (prompt, schema, parser) is in ./canvas-draft.ts. Founder content is never logged here.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { complete } from "@/lib/ai";
+import { AI_DAILY_LIMIT_COPY } from "@/lib/ai-request";
 import type { AIErrorKind } from "@/lib/ai-request";
 import { buildDraftMessages, parseDraft } from "./canvas-draft";
 
-export type DraftErrorCode = "already_drafted" | "in_progress" | "not_found" | "ai_failed" | "invalid_output";
+export type DraftErrorCode =
+  "already_drafted" | "in_progress" | "not_found" | "ai_failed" | "invalid_output" | "daily_limit";
 
 export type DraftResult = { ok: true } | { ok: false; code: DraftErrorCode; message: string };
 
 const AI_FAILURE_COPY: Record<AIErrorKind, string> = {
   timeout: "The AI took too long to answer. Try again in a moment.",
   rate_limited: "The AI service is busy right now. Try again in a minute.",
+  daily_limit: AI_DAILY_LIMIT_COPY,
   provider_error: "We couldn't reach the AI service. Try again in a moment.",
   invalid_response: "The AI service sent back something unreadable. Try again.",
 };
@@ -87,7 +90,11 @@ export async function draftCanvas(params: {
     await releaseLease(supabase, projectId);
     // eslint-disable-next-line no-console
     console.error("canvas draft AI call failed", ai.error.kind);
-    return { ok: false, code: "ai_failed", message: AI_FAILURE_COPY[ai.error.kind] };
+    return {
+      ok: false,
+      code: ai.error.kind === "daily_limit" ? "daily_limit" : "ai_failed",
+      message: AI_FAILURE_COPY[ai.error.kind],
+    };
   }
 
   const parsed = parseDraft(ai.text);
