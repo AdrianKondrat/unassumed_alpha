@@ -1,0 +1,2 @@
+-- Intentionally empty: this project has no seed data.
+-- Kept so that `[db.seed] sql_paths = ["./seed.sql"]` in config.toml resolves on `supabase db reset`.

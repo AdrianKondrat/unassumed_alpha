@@ -203,22 +203,24 @@ No existing data. Rollback is dropping the trigger, function, policies, and tabl
 
 > Convention: `- [ ]` pending, `- [x]` done. Append ` — <commit sha>` when a step lands. Do not rename step titles. See `references/progress-format.md`.
 
+> Verification note: the sandbox has no Docker, so `supabase db reset` was emulated with native Postgres 16 + GoTrue + PostgREST applying `supabase/migrations/*.sql` then `seed.sql`. SQL assertions were mutation-checked (dropping the trigger, the unique index, or adding a permissive policy each fails the script). Real signup through GoTrue created one workspace + owner membership per founder.
+
 ### Phase 1: Migration tooling baseline
 
 #### Automated
 
-- [ ] 1.1 Local stack resets cleanly with no migrations: `npx supabase db reset`
+- [x] 1.1 Local stack resets cleanly with no migrations: `npx supabase db reset`
 
 #### Manual
 
-- [ ] 1.2 `supabase/migrations/` and `supabase/seed.sql` exist and are tracked
+- [x] 1.2 `supabase/migrations/` and `supabase/seed.sql` exist and are tracked
 
 ### Phase 2: Workspace schema, trigger, and RLS
 
 #### Automated
 
-- [ ] 2.1 Migration applies cleanly on a fresh database: `npx supabase db reset`
-- [ ] 2.2 No schema drift or lint errors in the new migration: `npx supabase db lint`
+- [x] 2.1 Migration applies cleanly on a fresh database: `npx supabase db reset`
+- [ ] 2.2 No schema drift or lint errors in the new migration: `npx supabase db lint` (not run: needs Docker, unavailable in the build sandbox; run locally)
 
 #### Manual
 
@@ -229,11 +231,11 @@ No existing data. Rollback is dropping the trigger, function, policies, and tabl
 
 #### Automated
 
-- [ ] 3.1 Assertion script passes on a reset database
-- [ ] 3.2 Type checking passes: `npx astro check`
-- [ ] 3.3 Linting passes: `npm run lint`
-- [ ] 3.4 Build passes: `npm run build`
-- [ ] 3.5 Smoke test still passes: `npm run smoke`
+- [x] 3.1 Assertion script passes on a reset database
+- [x] 3.2 Type checking passes: `npx astro check`
+- [x] 3.3 Linting passes: `npm run lint`
+- [x] 3.4 Build passes: `npm run build`
+- [ ] 3.5 Smoke test still passes: `npm run smoke` (re-verified in S-01 against a real GoTrue)
 
 #### Manual
 

@@ -1,7 +1,7 @@
 ---
 change_id: data-workspace-scaffold
 title: Data workspace scaffold (roadmap F-01)
-status: planned
+status: implemented
 created: 2026-10-01
 updated: 2026-10-01
 archived_at: null
