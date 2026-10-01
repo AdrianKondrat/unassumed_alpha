@@ -2,14 +2,22 @@
 import Layout from "@/layouts/Layout.astro";
 import { createClient } from "@/lib/supabase";
 import { getCurrentWorkspace } from "@/lib/services/workspace";
+import { getCurrentProject } from "@/lib/services/project";
 
 const { user } = Astro.locals;
 const supabase = createClient(Astro.request.headers, Astro.cookies);
 const workspace = supabase ? await getCurrentWorkspace(supabase) : null;
+const project = supabase && workspace ? await getCurrentProject(supabase) : null;
 const passwordChanged = Astro.url.searchParams.get("passwordChanged") === "1";
 
 const stages = [
-  { n: "01", name: "Scribble", body: "Rough notes become a canvas of claims you can argue with." },
+  {
+    n: "01",
+    name: "Scribble",
+    body: "Rough notes become a canvas of claims you can argue with.",
+    href: project ? "/project" : "/project/new",
+    cta: project ? "Open your canvas" : "Start your project",
+  },
   { n: "02", name: "Assumption", body: "Claims become named, testable assumptions." },
   { n: "03", name: "Rehearsal", body: "Practise the interview. We score your questions, never your idea." },
 ];
@@ -30,6 +38,9 @@ const stages = [
       <>
         <h1 class="disp text-[clamp(2.4rem,6vw,4.4rem)]">{workspace.name}</h1>
         <p class="mono-note mt-3">{user?.email}</p>
+        <a href={project ? "/project" : "/project/new"} class="btn btn-yellow mt-8">
+          {project ? "Open your canvas" : "Create your project"}
+        </a>
       </>
     ) : (
       <div role="alert" class="notice notice-error max-w-xl">
@@ -48,7 +59,13 @@ const stages = [
             <div class="font-mono text-xs font-bold tracking-[0.16em] text-ink-mute">{s.n}</div>
             <h3 class="disp mt-2 text-3xl">{s.name}</h3>
             <p class="mt-3 text-ink-soft">{s.body}</p>
-            <span class="tag tag-open mt-5">Coming next</span>
+            {s.href ? (
+              <a href={s.href} class="link mt-5 inline-block">
+                {s.cta}
+              </a>
+            ) : (
+              <span class="tag tag-open mt-5">Coming next</span>
+            )}
           </li>
         ))}
       </ol>

@@ -2,9 +2,14 @@
 // including email verification and password reset by following the links actually emailed.
 // Zero dependencies on purpose. Run against a live server with a local Supabase (email confirmations on):
 //   BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 node scripts/smoke.mjs
+//
+// Product-flow steps (project, canvas draft, ...) also need the fake OpenRouter (scripts/fake-openrouter.mjs)
+// running, with the app started using OPENROUTER_BASE_URL pointing at it. Set FAKE_AI_URL to its origin
+// (e.g. http://127.0.0.1:4010) to include them; without it they are skipped.
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:4321";
 const MAIL_URL = process.env.MAIL_URL ?? "http://127.0.0.1:54324";
+const FAKE_AI_URL = process.env.FAKE_AI_URL ?? "";
 const email = `smoke-${Date.now()}@example.com`;
 const password = "Smoke-Test-Passw0rd!";
 const newPassword = "Smoke-Test-New-Passw0rd!";
@@ -105,9 +110,41 @@ async function followEmailedLink(link) {
 
 const post = (path, form) => () => request(path, { method: "POST", form });
 
+const check = (condition, message) => {
+  if (!condition) throw new Error(message);
+};
+const countOf = (text, needle) => text.split(needle).length - 1;
+
+async function fake(path) {
+  const response = await fetch(FAKE_AI_URL + path, { method: path === "/__reset" ? "POST" : "GET" });
+  return response.json();
+}
+const aiCalls = () => fake("/__calls");
+
+const BRIEF = "A subscription box for left-handed gardeners, sold online with a monthly plan.";
+const BLOCK_LABELS = [
+  "Customer segments",
+  "Value propositions",
+  "Channels",
+  "Customer relationships",
+  "Revenue streams",
+  "Key resources",
+  "Key activities",
+  "Key partners",
+  "Cost structure",
+];
+let callsBefore = 0;
+
 const steps = [
   ["home renders", () => request("/"), { status: 200 }],
   ["dashboard redirects anonymous user", () => request("/dashboard"), { status: 302, location: "/auth/signin" }],
+  ["project page redirects anonymous user", () => request("/project"), { status: 302, location: "/auth/signin" }],
+  [
+    "creating a project anonymously is refused",
+    post("/api/projects", { brief: BRIEF }),
+    { status: 302, location: "/auth/signin" },
+  ],
+  ["drafting anonymously is refused", post("/api/projects/draft"), { status: 302, location: "/auth/signin" }],
   [
     "reset-password page redirects anonymous user",
     () => request("/auth/reset-password"),
@@ -229,6 +266,185 @@ const steps = [
     { status: 302, location: "/dashboard" },
   ],
   ["dashboard renders for signed-in user", () => request("/dashboard"), { status: 200 }],
+  ...(FAKE_AI_URL
+    ? [
+        [
+          "fake OpenRouter is reachable and reset",
+          async () => ({ status: (await fake("/__reset")).mode === "ok" ? 200 : 500, location: "" }),
+          { status: 200 },
+        ],
+        [
+          "without a project, /project sends the founder to /project/new",
+          () => request("/project"),
+          { status: 302, location: "/project/new" },
+        ],
+        [
+          "new-project page renders with the brief form",
+          async () => {
+            const r = await request("/project/new");
+            check(r.text.includes('name="brief"') && r.text.includes("Save my notes"), "form missing");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "a too-short brief is rejected with a message",
+          post("/api/projects", { brief: "too short" }),
+          { status: 302, location: "/project/new?error=" },
+        ],
+        [
+          "dashboard offers to create the project",
+          async () => {
+            const r = await request("/dashboard");
+            check(r.text.includes("Create your project"), "create CTA missing");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "a valid brief (CRLF newlines) creates the project",
+          post("/api/projects", { brief: BRIEF + "\r\nSecond line." }),
+          { status: 302, location: "/project" },
+        ],
+        [
+          "a second project is refused politely, not as an error",
+          post("/api/projects", { brief: BRIEF + " Another one." }),
+          { status: 302, location: "/project" },
+        ],
+        [
+          "/project/new now redirects to the existing project",
+          () => request("/project/new"),
+          { status: 302, location: "/project" },
+        ],
+        [
+          "canvas page keeps the brief and offers to draft",
+          async () => {
+            const r = await request("/project");
+            check(
+              r.text.includes("Draft my canvas") && r.text.includes("left-handed gardeners"),
+              "draft prompt or brief missing",
+            );
+            check(!r.text.includes('class="tag tag-yellow"'), "claims shown before drafting");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "dashboard now offers to open the canvas",
+          async () => {
+            const r = await request("/dashboard");
+            check(r.text.includes("Open your canvas") && !r.text.includes("Create your project"), "open CTA missing");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "provider failure (500) keeps the brief and shows Retry",
+          async () => {
+            await fake("/__mode?set=http500");
+            const r = await request("/api/projects/draft", { method: "POST" });
+            check(r.location === "/project?draftError=ai_failed", `redirected to ${r.location}`);
+            const page = await request(r.location);
+            check(
+              page.text.includes("Your notes are safe") && page.text.includes("Try again"),
+              "retry message missing",
+            );
+            check(page.text.includes("left-handed gardeners"), "brief lost");
+            return { status: page.status, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "unparseable model output is rejected, nothing saved",
+          async () => {
+            await fake("/__mode?set=garbage");
+            const r = await request("/api/projects/draft", { method: "POST" });
+            check(r.location === "/project?draftError=invalid_output", `redirected to ${r.location}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a draft claiming ideas are 'validated' is rejected",
+          async () => {
+            await fake("/__mode?set=viability");
+            const r = await request("/api/projects/draft", { method: "POST" });
+            check(r.location === "/project?draftError=invalid_output", `redirected to ${r.location}`);
+            const page = await request("/project");
+            check(!/validated/i.test(page.text.replace(/unvalidated/gi, "")), "forbidden wording reached the page");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "an unknown draftError code is never echoed",
+          async () => {
+            const r = await request("/project?draftError=%3Cscript%3Ealert(1)%3C/script%3E");
+            check(!r.text.includes("<script>alert"), "query string echoed");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "two parallel draft requests cost exactly one AI call",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            await fetch(`${FAKE_AI_URL}/__mode?set=slow&ms=1500`);
+            const [a, b] = await Promise.all([
+              request("/api/projects/draft", { method: "POST" }),
+              request("/api/projects/draft", { method: "POST" }),
+            ]);
+            check(a.status === 302 && b.status === 302, "unexpected status");
+            const used = (await aiCalls()).length - callsBefore;
+            check(used === 1, `expected 1 AI call, saw ${used}`);
+            await fake("/__mode?set=ok");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "canvas shows 9 blocks with 18 claims, every one marked AI draft",
+          async () => {
+            const r = await request("/project");
+            for (const label of BLOCK_LABELS) check(r.text.includes(label), `block missing: ${label}`);
+            check(countOf(r.text, 'class="tag tag-yellow"') >= 18, "fewer than 18 AI draft tags");
+            check(r.text.includes("first draft to argue with"), "honesty note missing");
+            check(!r.text.includes("Draft my canvas"), "draft action still offered");
+            check(!r.text.includes('class="tag tag-teal"'), "founder tag on an AI-only canvas");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "a second draft is a no-op and spends nothing",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            const r = await request("/api/projects/draft", { method: "POST" });
+            check(r.location === "/project", `redirected to ${r.location}`);
+            check((await aiCalls()).length === callsBefore, "AI was called again");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "every provider call asked for zero data retention and JSON mode",
+          async () => {
+            const calls = await aiCalls();
+            check(calls.length > 0, "no provider calls recorded");
+            check(
+              calls.every((c) => c.dataCollection === "deny"),
+              "a call lacked data_collection=deny",
+            );
+            check(
+              calls.every((c) => c.jsonMode && c.authorised && c.task === "draft"),
+              "unexpected call shape",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+      ]
+    : []),
   ["final signout", post("/api/auth/signout"), { status: 302, location: "/" }],
 ];
 

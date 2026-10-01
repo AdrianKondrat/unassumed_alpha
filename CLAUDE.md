@@ -10,8 +10,8 @@ This file provides guidance to AI Agent when working with code in this repositor
 - `npm run lint` — ESLint with type-checked rules
 - `npm run lint:fix` — auto-fix lint issues
 - `npm run format` — Prettier (includes prettier-plugin-astro + prettier-plugin-tailwindcss)
-- `npm run smoke` — dependency-free end-to-end auth smoke test (`scripts/smoke.mjs`) against a running server: signup, email verification and password reset by following the emailed links read from the local mail server. Env: `BASE_URL` (default `http://localhost:4321`), `MAIL_URL` (default `http://127.0.0.1:54324`). CI runs it against the production preview with a local Supabase.
-- `npm run test:ai`, `npm run test:auth` — offline unit checks for the pure modules (`src/lib/ai-request.ts`, `src/lib/auth.ts`), run with `node --experimental-strip-types`. Each slice adds its own `test:*` script the same way.
+- `npm run smoke` — dependency-free end-to-end smoke test (`scripts/smoke.mjs`) against a running server: auth (signup, email verification, password reset by following emailed links) and, when `FAKE_AI_URL` is set, the product flow against `scripts/fake-openrouter.mjs` (run it on :4010 and start the app with `OPENROUTER_BASE_URL=http://127.0.0.1:4010/v1`; it has `/__mode`, `/__calls`, `/__reset` controls and each AI slice registers a handler there). Env: `BASE_URL` (default `http://localhost:4321`), `MAIL_URL` (default `http://127.0.0.1:54324`). CI runs it against the production preview with a local Supabase.
+- `npm run test:ai`, `npm run test:auth`, `npm run test:canvas` — offline unit checks for the pure modules (`src/lib/ai-request.ts`, `src/lib/auth.ts`, `src/lib/ai-output.ts` + `src/lib/services/canvas-draft.ts`), run with `node --experimental-strip-types`. Each slice adds its own `test:*` script the same way.
 - SQL assertions: `for f in supabase/tests/*.sql; do psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -f "$f"; done` against a reset local DB (see `supabase/README.md`).
 
 Pre-commit hooks: husky + lint-staged runs `eslint --fix` on `*.{ts,tsx,astro}` and `prettier --write` on `*.{json,css,md}`.
@@ -37,6 +37,12 @@ Full server-side rendering (`output: "server"` in astro.config.mjs). All pages a
 ### AI call path
 
 - `src/lib/ai.ts` `complete({ taskKind, messages, supabase, founderId, … })` is the only way to call a model: OpenRouter with `provider.data_collection = "deny"` on every request, per-task model/timeout in `src/lib/ai-request.ts` (`TASK_CONFIG`), one retry, typed `AIResult`, one `ai_usage_events` row per success. Founder content and persona details must never be logged or returned to clients.
+
+### Project and canvas (S-02)
+
+- Tables `projects` (one per workspace, unique `workspace_id`) and `canvas_claims` (9-block vocabulary, `origin` = `ai_draft | founder`, `revision`). `public.is_project_member(project uuid)` is the RLS helper for everything that hangs off a project; `public.claim_draft_lease(project uuid)` is the atomic in-flight lease (60 s staleness, DB clock). Do **not** build leases as a PostgREST `update` with `or=` + `select`: it fails on PostgREST 12.2.3. Use a function.
+- Pure modules: `src/lib/ai-output.ts` (`extractJson`, `findForbiddenWording`, `NO_VIABILITY_CLAIMS_RULE`; shared by all AI slices) and `src/lib/services/canvas-draft.ts` (blocks, prompt, zod schema, `parseDraft`, `briefSchema`). Orchestration: `canvas-draft-service.ts` (`draftCanvas`), `project.ts` (`getCurrentProject`, `listClaims`, `createProject`).
+- Routes: `POST /api/projects` (save brief first), `POST /api/projects/draft` (redirects to `/project`, `?draftError=<code>` on failure; only known codes are rendered). Pages: `/project/new`, `/project`; components in `src/components/canvas/`. Slow AI forms use `data-pending` + `src/scripts/pending-forms.ts`.
 
 ### UI / brand
 

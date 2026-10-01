@@ -21,6 +21,7 @@ jobs:
       - run: npx astro check
       - run: npm run test:ai
       - run: npm run test:auth
+      - run: npm run test:canvas
       - run: npm run build
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -52,14 +53,18 @@ jobs:
       - name: Configure secrets for build and preview
         run: |
           source supabase.env
-          printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\n' "$API_URL" "$ANON_KEY" > .env
+          # The AI provider is a local fake (scripts/fake-openrouter.mjs): deterministic, free, and it records
+          # whether every request carried the zero-data-retention flag.
+          printf 'SUPABASE_URL=%s\nSUPABASE_KEY=%s\nOPENROUTER_API_KEY=ci-fake-key\nOPENROUTER_BASE_URL=http://127.0.0.1:4010/v1\n' "$API_URL" "$ANON_KEY" > .env
           cp .env .dev.vars
       - run: npm run build
       - name: Run smoke test against production preview
         run: |
+          node scripts/fake-openrouter.mjs &
           npm run preview -- --port 4321 &
           for i in $(seq 1 60); do curl -sf -o /dev/null http://localhost:4321/ && break; sleep 1; done
-          BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 npm run smoke
+          for i in $(seq 1 30); do curl -sf -o /dev/null http://127.0.0.1:4010/__calls && break; sleep 1; done
+          BASE_URL=http://localhost:4321 MAIL_URL=http://127.0.0.1:54324 FAKE_AI_URL=http://127.0.0.1:4010 npm run smoke
       - if: always()
         run: supabase stop --no-backup
 

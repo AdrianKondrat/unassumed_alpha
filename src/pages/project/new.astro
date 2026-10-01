@@ -1,0 +1,83 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { createClient } from "@/lib/supabase";
+import { getCurrentProject } from "@/lib/services/project";
+import { BRIEF_MAX_LENGTH, BRIEF_MIN_LENGTH } from "@/lib/services/canvas-draft";
+
+const supabase = createClient(Astro.request.headers, Astro.cookies);
+const existing = supabase ? await getCurrentProject(supabase) : null;
+if (existing) return Astro.redirect("/project");
+
+const error = Astro.url.searchParams.get("error");
+---
+
+<Layout title="Start your project" current="project">
+  <div class="mx-auto w-[min(760px,100%-32px)] py-10 sm:py-14">
+    <div class="eyebrow mb-5">
+      <i></i> Scribble
+    </div>
+    <h1 class="disp text-[clamp(2.2rem,5.5vw,3.8rem)]">What are you thinking of building?</h1>
+    <p class="mt-4 max-w-[60ch] text-ink-soft">
+      Rough notes are fine. We will draft a Business Model Canvas from them as a starting point. Every claim the AI
+      writes is a guess for you to challenge, not a fact. You get one project in this release.
+    </p>
+
+    {error && (
+      <p role="alert" class="notice notice-error mt-8">
+        {error}
+      </p>
+    )}
+
+    <form method="POST" action="/api/projects" class="card mt-8 p-6 sm:p-8" data-pending>
+      <label for="brief" class="label">
+        Your notes
+      </label>
+      <textarea
+        id="brief"
+        name="brief"
+        required
+        minlength={BRIEF_MIN_LENGTH}
+        maxlength={BRIEF_MAX_LENGTH}
+        rows="10"
+        class="input resize-y"
+        aria-describedby="brief-hint brief-count"
+        placeholder="Who is it for, what problem do they have, and how do you imagine they would pay? Bullet points and half-sentences are fine."
+      ></textarea>
+      <div class="mt-2 flex flex-wrap items-start justify-between gap-x-6 gap-y-1">
+        <p id="brief-hint" class="mono-note">
+          Avoid pasting anything confidential. Requests go only to AI providers that state they don't retain prompts or
+          train on them.
+        </p>
+        <p id="brief-count" class="mono-note" data-brief-count aria-live="polite">
+          {BRIEF_MIN_LENGTH} to {BRIEF_MAX_LENGTH} characters
+        </p>
+      </div>
+      <div class="mt-6 flex flex-wrap items-center gap-4">
+        <button type="submit" class="btn btn-yellow">
+          Save my notes
+        </button>
+        <p data-pending-status hidden class="mono-note" role="status">
+          Saving…
+        </p>
+      </div>
+    </form>
+  </div>
+</Layout>
+
+<script>
+  import "@/scripts/pending-forms";
+
+  const textarea = document.querySelector<HTMLTextAreaElement>("#brief");
+  const counter = document.querySelector<HTMLElement>("[data-brief-count]");
+  if (textarea && counter) {
+    const min = textarea.minLength;
+    const max = textarea.maxLength;
+    const update = () => {
+      const length = textarea.value.replace(/\r\n?/g, "\n").trim().length;
+      counter.textContent =
+        length < min ? `${length} / ${max} · ${min - length} more to go` : `${length} / ${max} characters`;
+    };
+    textarea.addEventListener("input", update);
+    update();
+  }
+</script>

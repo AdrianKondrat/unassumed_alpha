@@ -1,5 +1,7 @@
 # AI-Drafted Canvas from Brief Implementation Plan
 
+> **Implemented on `mvp` (2026-10-01).** Deviations from this plan are listed under "Implementation notes" at the end of the Progress section.
+
 ## Overview
 
 A verified founder creates their one project from a short rough-notes brief and gets an AI-drafted Business Model Canvas (9 blocks). Every AI-authored claim is persisted with `origin = 'ai_draft'` and rendered with a visible "AI draft" badge, distinct from founder-authored claims. This is slice S-02 in `context/foundation/roadmap.md` (PRD FR-005, FR-006).
@@ -309,11 +311,11 @@ Pre-launch, no data to migrate. Rollback is dropping the two tables (claims firs
 
 #### Automated
 
-- [ ] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
+- [x] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
 - [ ] 1.2 No migration lint errors: `npx supabase db lint`
-- [ ] 1.3 SQL assertions pass: `psql ... -f supabase/tests/projects_and_canvas_claims.sql`
-- [ ] 1.4 Type checking passes: `npx astro check`
-- [ ] 1.5 Linting passes: `npm run lint`
+- [x] 1.3 SQL assertions pass: `psql ... -f supabase/tests/projects_and_canvas_claims.sql`
+- [x] 1.4 Type checking passes: `npx astro check`
+- [x] 1.5 Linting passes: `npm run lint`
 
 #### Manual
 
@@ -323,43 +325,53 @@ Pre-launch, no data to migrate. Rollback is dropping the two tables (claims firs
 
 #### Automated
 
-- [ ] 2.1 Fixture tests pass: `npm run test:canvas`
-- [ ] 2.2 Type checking passes: `npx astro check`
-- [ ] 2.3 Linting passes: `npm run lint`
-- [ ] 2.4 Build passes: `npm run build`
+- [x] 2.1 Fixture tests pass: `npm run test:canvas`
+- [x] 2.2 Type checking passes: `npx astro check`
+- [x] 2.3 Linting passes: `npm run lint`
+- [x] 2.4 Build passes: `npm run build`
 
 #### Manual
 
-- [ ] 2.5 Prompt reviewed: claims framed as hypotheses, viability wording forbidden
+- [x] 2.5 Prompt reviewed: claims framed as hypotheses, viability wording forbidden
 
 ### Phase 3: API routes
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npx astro check`
-- [ ] 3.2 Linting passes: `npm run lint`
-- [ ] 3.3 Build passes: `npm run build`
-- [ ] 3.4 Smoke test still passes: `npm run smoke`
+- [x] 3.1 Type checking passes: `npx astro check`
+- [x] 3.2 Linting passes: `npm run lint`
+- [x] 3.3 Build passes: `npm run build`
+- [x] 3.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
-- [ ] 3.5 Second project creation yields friendly cap message and one row
-- [ ] 3.6 Rapid double draft call yields a single set of claims
-- [ ] 3.7 Invalid API key leaves no claims and resets `draft_started_at`
+- [x] 3.5 Second project creation yields friendly cap message and one row
+- [x] 3.6 Rapid double draft call yields a single set of claims
+- [x] 3.7 Invalid API key leaves no claims and resets `draft_started_at`
 
 ### Phase 4: UI
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npx astro check`
-- [ ] 4.2 Linting passes: `npm run lint`
-- [ ] 4.3 Build passes: `npm run build`
-- [ ] 4.4 Smoke test still passes: `npm run smoke`
+- [x] 4.1 Type checking passes: `npx astro check`
+- [x] 4.2 Linting passes: `npm run lint`
+- [x] 4.3 Build passes: `npm run build`
+- [x] 4.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
 - [ ] 4.5 End-to-end: brief to project to badged 9-block canvas on local Supabase with a real key
-- [ ] 4.6 Reload keeps canvas; draft action hidden once claims exist
+- [x] 4.6 Reload keeps canvas; draft action hidden once claims exist
 - [ ] 4.7 Forced failure shows message and Retry; retry succeeds after fixing key
-- [ ] 4.8 Second account cannot see the first account's data
-- [ ] 4.9 Badge perceivable without color; form and retry keyboard-accessible
+- [x] 4.8 Second account cannot see the first account's data
+- [x] 4.9 Badge perceivable without color; form and retry keyboard-accessible
+
+### Implementation notes (deviations and unverified items)
+
+- **Verification environment.** Docker is unavailable in the build sandbox, so 1.1 was verified with `scripts/sandbox-stack/stack.sh reset` (real Postgres 16 + GoTrue + PostgREST applying the same migrations) rather than `npx supabase db reset`. Steps 1.2 (`supabase db lint`) and 1.6 (Studio policy view) are **not run**: they need the real Supabase CLI. CI's `smoke` job runs the SQL assertions on the real CLI stack.
+- **Real model not exercised.** `openrouter.ai` is blocked in the sandbox, so 4.5 (end to end with a real key) is **not verified**. Everything else was exercised against `scripts/fake-openrouter.mjs`, which mimics the OpenRouter endpoint and records the privacy flag. 4.7 was verified with the fake in failure modes (HTTP 500, unparseable output, "validated" wording) followed by a successful retry.
+- **Lease is a database function, not a conditional PostgREST update.** The plan's `update ... or(draft_started_at.is.null,...)` + `select` failed on PostgREST 12.2.3 (`42703 column does not exist`). Replaced by `public.claim_draft_lease(project uuid) returns boolean` (security invoker, uses the DB clock, 60 s staleness), added to the same migration (`20261001100200_projects_and_canvas_claims.sql`) and covered by SQL assertions. S-04 should add the same shape for `suggest_started_at`.
+- **Shared module.** Fence stripping, JSON extraction and the banned-wording check live in `src/lib/ai-output.ts` (not in `canvas-draft.ts`) so S-04/S-05/S-06 reuse them. The banned list is `validated`/`proven` as whole words (so "unvalidated" is fine).
+- **Brief handling.** `briefSchema` normalises CRLF to LF before the 20-2000 length check (browsers submit CRLF), and the form carries `minlength`/`maxlength` plus a live counter, so a long brief is not lost to a server-side rejection.
+- **Additions beyond the plan.** `src/scripts/pending-forms.ts` (disable submit + status text on slow AI forms), a "Canvas" nav item, `scripts/fake-openrouter.mjs` and 20 new smoke steps (anonymous guards, validation, cap, three failure modes, parallel-draft race = exactly one AI call, 9 blocks / 18 badged claims, no AI call on second draft, `data_collection=deny` + JSON mode on every provider call). CI's `smoke` job now runs the fake and passes `FAKE_AI_URL`; the `ci` job runs `npm run test:canvas`.
+- **Claims for founders.** `ClaimCard` already renders a teal "You" tag for `origin = 'founder'` so S-03 only needs to create such claims.

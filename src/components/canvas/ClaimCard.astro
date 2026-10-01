@@ -1,0 +1,30 @@
+---
+import type { CanvasClaim } from "@/types";
+
+interface Props {
+  claim: CanvasClaim;
+}
+
+const { claim } = Astro.props;
+const isAi = claim.origin === "ai_draft";
+---
+
+<li
+  class:list={[
+    "flex flex-col gap-2 border-l-4 py-1 pl-3",
+    isAi ? "border-dashed border-ink-mute" : "border-solid border-teal",
+  ]}
+>
+  <p class="text-[15px] leading-snug">{claim.text}</p>
+  <span>
+    {isAi ? (
+      <span class="tag tag-yellow" title="Written by the AI as a starting point. Review it and change it.">
+        <span class="sr-only">Written by: </span>AI draft
+      </span>
+    ) : (
+      <span class="tag tag-teal">
+        <span class="sr-only">Written by: </span>You
+      </span>
+    )}
+  </span>
+</li>

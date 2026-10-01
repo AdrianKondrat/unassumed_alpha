@@ -33,7 +33,7 @@ First-time founders tend to ask their prospective customers leading, hypothetica
 | F-02 | ai-provider-integration                    | (foundation) server-only AI-provider call path; secrets/persona never client-side                             | —             | NFR (privacy/latency)          | done   |
 | F-03 | mvp-branch-deploy-pipeline                 | (foundation) CI deploys the MVP branch to its own Cloudflare Workers environment (the `unassumed-mvp` Worker) | —             | FR-018                         | built  |
 | S-01 | verified-account-and-workspace             | sign up, verify email, sign in/out, reset password, land in own workspace                                     | F-01          | FR-001, FR-002, FR-003, FR-004 | done   |
-| S-02 | ai-drafted-canvas-from-brief               | create the one project from a brief and get an AI-drafted canvas                                              | S-01, F-02    | FR-005, FR-006                 | ready  |
+| S-02 | ai-drafted-canvas-from-brief               | create the one project from a brief and get an AI-drafted canvas                                              | S-01, F-02    | FR-005, FR-006                 | done   |
 | S-03 | manual-canvas-editing-with-conflict-safety | edit canvas claims manually with edits protected against silent overwrite                                     | S-02          | FR-007, FR-008                 | ready  |
 | S-04 | assumption-suggestion-and-lifecycle        | request AI-suggested assumptions, accept/edit/reject them, set lifecycle status                               | S-02, F-02    | FR-009, FR-010, FR-011         | ready  |
 | S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | ready  |
@@ -129,7 +129,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** The AI-drafted claims must read as a clearly-marked starting point, not authority — getting the visual/data distinction right here protects the product's "honest resistance, not flattery" positioning for everything downstream.
-- **Status:** ready — prerequisites F-01, F-02, S-01 are done.
+- **Status:** done — implemented on `mvp`; verified end to end against the fake provider. Live-model check pending (see handoff).
 
 ### S-03: Manual canvas editing with conflict safety
 
@@ -200,7 +200,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 | F-02       | ai-provider-integration                    | Wire server-only AI-provider call path (OpenRouter)              | done                  | Implemented; unlocks the north star                |
 | F-03       | mvp-branch-deploy-pipeline                 | Add Cloudflare Workers deploy step to CI for the MVP branch      | built                 | Needs secrets + first push to `mvp` to confirm     |
 | S-01       | verified-account-and-workspace             | Close auth gaps (email verification, password reset) + workspace | done                  | Implemented                                        |
-| S-02       | ai-drafted-canvas-from-brief               | Project creation + AI-drafted canvas                             | no                    | Ready: prerequisites done, plan exists             |
+| S-02       | ai-drafted-canvas-from-brief               | Project creation + AI-drafted canvas                             | done                  | Implemented                                        |
 | S-03       | manual-canvas-editing-with-conflict-safety | Manual canvas editing with conflict-safe saves                   | no                    | Ready after S-02; reconcile plan first             |
 | S-04       | assumption-suggestion-and-lifecycle        | AI-suggested assumptions + accept/edit/reject + lifecycle status | no                    | Ready after S-02; plan exists                      |
 | S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | no                    | Ready after S-04; reconcile plan first             |
@@ -226,4 +226,5 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **F-01 data-workspace-scaffold** — workspaces + owner membership created atomically by a signup trigger, RLS pattern, SQL assertions. 2026-10-01.
 - **F-02 ai-provider-integration** — server-only OpenRouter call path, zero-data-retention flag on every request, usage ledger, offline tests. 2026-10-01 (live-key check pending).
 - **S-01 verified-account-and-workspace** — mandatory email verification, resend, password reset, workspace landing, brand foundation, end-to-end smoke test. 2026-10-01.
+- **S-02 ai-drafted-canvas-from-brief** — one project from a brief, AI-drafted 9-block canvas with distinct AI-draft markers, DB-enforced one-project cap, race-safe drafting lease. 2026-10-01 (live-key check pending).
 - **F-03 mvp-branch-deploy-pipeline** — built, awaiting first real deploy (see item status).
