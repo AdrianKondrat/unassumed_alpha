@@ -13,7 +13,7 @@ Branch `mvp` (push here only; **never open a PR unless the user asks**). Default
 | F-03 deploy pipeline (Worker `unassumed-mvp`, CI deploy job)                              | 7d83f26 |
 | S-01 verified account, reset password, workspace landing, brand foundation, 30-step smoke | 5f4ba65 |
 
-**Next, in order:** S-02 → S-04 (S-03 can run in parallel/after) → S-05 → S-06 (north star) → S-07 (no plan yet; write one with `/10x-plan`, then implement). Then polish (below). Every slice has `plan.md` with phases and a Progress checklist: follow it, tick boxes honestly, append notes for deviations, set `change.md` `status: implemented`, update `roadmap.md` (status + Done), and update `CLAUDE.md` for new conventions.
+**Next, in order:** S-02 → S-04 (S-03 can run in parallel/after) → S-05 → S-06 (north star) → S-07 (plan exists, written by the user/another session). Then polish (below). Every slice has `plan.md` with phases and a Progress checklist: follow it, tick boxes honestly, append notes for deviations, set `change.md` `status: implemented`, update `roadmap.md` (status + Done), and update `CLAUDE.md` for new conventions.
 
 ## How the user wants to work
 
@@ -47,7 +47,7 @@ Branch `mvp` (push here only; **never open a PR unless the user asks**). Default
 - **S-05** must use `assumptions.statement` (not `text`) and needs the new `SUPABASE_SERVICE_ROLE_KEY` added to env schema, `.env.example`, CI build env **and the deploy job** (secrets list, env, required-secrets check, README).
 - **S-06** must map to S-05's real columns (`rehearsal_turns.question/seq/reply`); the `complete()` extension it asks for already exists.
 - **S-02/S-04:** use `jsonMode: true`; S-04 reuses S-02's `is_project_member()` and `projects` lease-column pattern (`draft_started_at` → `suggest_started_at`).
-- **S-07** has only a `change.md`: write a plan first (idempotent turn submission with a client-supplied turn key, resume on reload; S-05's `unique (session_id, seq)` is the foundation).
+- **S-07** now has a plan (`resumable-rehearsal-sessions/plan.md`): client idempotency key per question, `reply_started_at` lease, lazy 24h expiry (`ended_reason = 'expired'`, `last_activity_at`). It edits S-05's files and widens S-05's `ended_reason` check, so implement it after S-05 and reconcile names in its Phases 1-3 against what S-05 actually shipped. S-05 should keep `ended_reason`'s check easy to widen.
 
 ## Deviations already made (documented in the S-01/F-02/F-03 plans)
 
