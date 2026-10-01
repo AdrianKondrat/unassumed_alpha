@@ -26,3 +26,6 @@ pnpm-debug.log*
 
 # jetbrains setting folder
 .idea/
+
+# sandbox-stack runtime (binaries, logs, Go sources)
+scripts/sandbox-stack/.run/

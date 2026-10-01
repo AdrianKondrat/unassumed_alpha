@@ -1,5 +1,7 @@
 # Manual Canvas Editing with Conflict Safety Implementation Plan
 
+> **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** This plan assumed an S-02 schema that the real S-02 plan does not use. Use S-02's actual `canvas_claims`: provenance column is `origin` (`'ai_draft' | 'founder'`), the version column is `revision` (not `version`), and there is **no `workspace_id` and no `updated_at`** on claims. Tenant access goes through `projects.workspace_id` via S-02's `is_project_member(project uuid)` helper. So: (1) the update/delete RLS policies must use that helper; (2) the version-bump trigger must also add `updated_at` if wanted (add the column in this migration); (3) editing a claim sets `origin = 'founder'` (replace every `author_kind = 'founder'` below); (4) the immutable-column guard covers `project_id` and `block`; (5) S-02 has a `unique (project_id, block, position)` constraint, so new claims need the next free `position` in the block and deletes leave gaps (fine). S-02's canvas page is `src/pages/project/index.astro`, and its claim badge component is `src/components/canvas/ClaimCard.astro`; the editor island replaces/extends those.
+
 ## Overview
 
 Let a founder edit, add and delete Business Model Canvas claims by hand, with no AI involved (FR-007). Every claim carries a version; each save is a version-checked write, so two edits racing against the same saved version yield one accepted update and one flagged conflict instead of silent loss (FR-008). This is roadmap slice S-03.

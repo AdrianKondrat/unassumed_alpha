@@ -1,5 +1,7 @@
 # Rehearsal Session Turn Exchange Implementation Plan
 
+> **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** (1) S-04 now has a plan: `public.assumptions(id, project_id, statement, risk_note, status in ('suggested','rejected','active','superseded','retired'), …)`. The column is **`statement`, not `text`**, and a rehearsable assumption is `status = 'active'`. Update the FK/list query/prompt inputs accordingly (`buildScenarioMessages({ brief, assumption })` takes the statement). (2) `complete()` already exists (F-02) and supports `jsonMode`, `timeoutMs` and `retry`: use `jsonMode: true` for scenario generation. (3) `SUPABASE_SERVICE_ROLE_KEY` is new: add it to `astro.config.mjs` env schema, `.env.example`, the CI `ci` build env, **and the `deploy` job** (`secrets:` list + env + required-secrets check in `.github/workflows/ci.yml`) and README "MVP deploy". (4) Reuse S-02's `is_project_member()` helper and its banned-word list (`validated`/`proven`) rather than duplicating.
+
 ## Overview
 
 A founder starts a rehearsal session for one of their active assumptions, exchanges up to 8 interview questions with a hidden AI persona, and ends the session early or automatically at the cap. The persona scenario never reaches the client. This is slice S-05 in `context/foundation/roadmap.md` (PRD FR-012, FR-013, FR-014). Scoring (S-06) and resume hardening (S-07) are separate slices.
