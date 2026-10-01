@@ -70,3 +70,25 @@ export interface AssumptionClaimLink {
   assumption_id: string;
   claim_id: string;
 }
+
+export type RehearsalStatus = "active" | "ended";
+
+/** Why a session ended. S-07 will add "expired". */
+export type RehearsalEndReason = "user" | "cap";
+
+export interface RehearsalSession {
+  id: string;
+  project_id: string;
+  assumption_id: string;
+  status: RehearsalStatus;
+  ended_reason: RehearsalEndReason | null;
+  created_at: string;
+  ended_at: string | null;
+}
+
+/** One question and the persona's reply (null until it lands). Deliberately has no scenario field. */
+export interface RehearsalTurn {
+  seq: number;
+  question: string;
+  reply: string | null;
+}

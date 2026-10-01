@@ -2,7 +2,7 @@ import { defineMiddleware } from "astro:middleware";
 import { createClient } from "@/lib/supabase";
 
 // Pages that require a signed-in, email-verified founder. Prefix match. API routes check `locals.user` themselves.
-const PROTECTED_ROUTES = ["/dashboard", "/project", "/assumptions", "/auth/reset-password"];
+const PROTECTED_ROUTES = ["/dashboard", "/project", "/assumptions", "/rehearsal", "/auth/reset-password"];
 
 export const onRequest = defineMiddleware(async (context, next) => {
   const supabase = createClient(context.request.headers, context.cookies);

@@ -18,6 +18,9 @@ export default defineConfig({
     schema: {
       SUPABASE_URL: envField.string({ context: "server", access: "secret", optional: true }),
       SUPABASE_KEY: envField.string({ context: "server", access: "secret", optional: true }),
+      // Server-only privileged key (bypasses RLS). Used only by src/lib/supabase-admin.ts for the hidden
+      // rehearsal persona tables; never expose it to a page, island or response.
+      SUPABASE_SERVICE_ROLE_KEY: envField.string({ context: "server", access: "secret", optional: true }),
       OPENROUTER_API_KEY: envField.string({ context: "server", access: "secret", optional: true }),
       // Optional: point the AI call path at another OpenRouter-compatible endpoint (local fakes, proxies).
       OPENROUTER_BASE_URL: envField.string({ context: "server", access: "secret", optional: true }),

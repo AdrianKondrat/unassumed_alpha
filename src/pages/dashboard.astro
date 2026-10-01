@@ -27,7 +27,14 @@ const stages = [
     cta: "Open your assumptions",
     waiting: "Draft your canvas first",
   },
-  { n: "03", name: "Rehearsal", body: "Practise the interview. We score your questions, never your idea." },
+  {
+    n: "03",
+    name: "Rehearsal",
+    body: "Practise the interview against a made-up customer. We score your questions, never your idea.",
+    href: hasCanvas ? "/rehearsal" : undefined,
+    cta: "Open your rehearsals",
+    waiting: "Draft your canvas first",
+  },
 ];
 ---
 

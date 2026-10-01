@@ -6,10 +6,15 @@
 // Product-flow steps (project, canvas draft, ...) also need the fake OpenRouter (scripts/fake-openrouter.mjs)
 // running, with the app started using OPENROUTER_BASE_URL pointing at it. Set FAKE_AI_URL to its origin
 // (e.g. http://127.0.0.1:4010) to include them; without it they are skipped.
+//
+// Optional: set SUPABASE_URL and SUPABASE_ANON_KEY to also prove, through the real PostgREST with the founder's
+// own session token, that the hidden rehearsal persona cannot be read or written by a client.
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:4321";
 const MAIL_URL = process.env.MAIL_URL ?? "http://127.0.0.1:54324";
 const FAKE_AI_URL = process.env.FAKE_AI_URL ?? "";
+const SUPABASE_URL = (process.env.SUPABASE_URL ?? "").replace(/\/+$/, "");
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY ?? "";
 const email = `smoke-${Date.now()}@example.com`;
 const password = "Smoke-Test-Passw0rd!";
 const newPassword = "Smoke-Test-New-Passw0rd!";
@@ -143,6 +148,62 @@ const idsOn = (html, kind) => [
 const suggest = () => request("/api/assumptions/suggest", { method: "POST" });
 const lastCalls = async (n) => (await aiCalls()).slice(-n);
 
+// ---- Rehearsal helpers (S-05) -----------------------------------------------------------------------
+// Planted by scripts/fake-openrouter.mjs in every generated persona scenario. It must never show up in any
+// page or API response the founder can see: `corpus` collects every body these steps fetch.
+const SCENARIO_MARKER = "SCENARIO-MARKER-9c1e";
+const corpus = [];
+const note = (text) => {
+  corpus.push(text);
+  return text;
+};
+async function api(path, { json, body, contentType = "application/json" } = {}) {
+  const response = await fetch(BASE_URL + path, {
+    method: "POST",
+    redirect: "manual",
+    headers: { Cookie: cookieHeader(), Origin: BASE_URL, "Content-Type": contentType },
+    body: body ?? JSON.stringify(json ?? {}),
+  });
+  storeCookies(response);
+  const text = note(await response.text());
+  let data = null;
+  try {
+    data = JSON.parse(text);
+  } catch {
+    // not JSON: leave data null
+  }
+  return { status: response.status, data, text };
+}
+/** A GET page with React's `<!-- -->` text separators removed so text assertions read naturally. */
+async function pageOf(path) {
+  const result = await request(path);
+  note(result.text);
+  return { ...result, text: result.text.replaceAll("<!-- -->", "") };
+}
+const sessionApi = (id, action) => `/api/rehearsal/sessions/${id}/${action}`;
+const ask = (id, question) => api(sessionApi(id, "turns"), { json: { question } });
+const startRehearsal = (assumptionId) => request("/api/rehearsal/sessions", { method: "POST", form: { assumptionId } });
+const sessionIdFrom = (location) => /^\/rehearsal\/([0-9a-f-]{36})$/.exec(location)?.[1] ?? "";
+const switchJar = (saved) => {
+  jar.clear();
+  for (const [name, value] of saved) jar.set(name, value);
+};
+const NIL_ID = "11111111-1111-1111-1111-111111111111";
+let rehearsable = [];
+let sessionOne = "";
+let sessionTwo = "";
+const emailB = `smoke-b-${Date.now()}@example.com`;
+
+/** The founder's Supabase access token, read from the auth cookie (chunked and base64url-encoded by @supabase/ssr). */
+function accessTokenFromJar() {
+  const chunks = [...jar.entries()]
+    .filter(([name]) => /^sb-.*-auth-token(\.\d+)?$/.test(name))
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([, value]) => decodeURIComponent(value));
+  const joined = chunks.join("").replace(/^base64-/, "");
+  return JSON.parse(Buffer.from(joined, "base64url").toString("utf8")).access_token;
+}
+
 const steps = [
   ["home renders", () => request("/"), { status: 200 }],
   ["dashboard redirects anonymous user", () => request("/dashboard"), { status: 302, location: "/auth/signin" }],
@@ -168,6 +229,28 @@ const steps = [
     "changing status anonymously is refused",
     post("/api/assumptions/11111111-1111-1111-1111-111111111111/status", { status: "retired" }),
     { status: 302, location: "/auth/signin" },
+  ],
+  ["rehearsal page redirects anonymous user", () => request("/rehearsal"), { status: 302, location: "/auth/signin" }],
+  [
+    "rehearsal session page redirects anonymous user",
+    () => request(`/rehearsal/${NIL_ID}`),
+    { status: 302, location: "/auth/signin" },
+  ],
+  [
+    "starting a rehearsal anonymously is refused",
+    post("/api/rehearsal/sessions", { assumptionId: NIL_ID }),
+    { status: 302, location: "/auth/signin" },
+  ],
+  [
+    "rehearsal JSON routes answer 401 to anonymous callers",
+    async () => {
+      for (const action of ["turns", "retry", "end"]) {
+        const r = await api(sessionApi(NIL_ID, action), { json: { question: "hello" } });
+        check(r.status === 401, `${action}: expected 401, saw ${r.status}`);
+      }
+      return { status: 200, location: "" };
+    },
+    { status: 200 },
   ],
   [
     "reset-password page redirects anonymous user",
@@ -723,7 +806,459 @@ const steps = [
           { status: 200 },
         ],
         [
-          "every provider call asked for zero data retention and JSON mode",
+          "rehearsal page lists the kept assumptions, explains the practice customer, and shows no scenario",
+          async () => {
+            const r = await pageOf("/rehearsal");
+            rehearsable = [...r.text.matchAll(/name="assumptionId" value="([0-9a-f-]{36})"/g)].map((m) => m[1]);
+            check(rehearsable.length === 3, `expected 3 rehearsable assumptions, saw ${rehearsable.length}`);
+            check(r.text.includes("Choose an assumption (3)") && r.text.includes("Start rehearsal"), "list missing");
+            check(r.text.includes("made-up customer") && r.text.includes("not evidence"), "framing missing");
+            check(!r.text.includes("Session in progress"), "an active session already exists");
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "starting on a pending or unknown assumption is refused without spending",
+          async () => {
+            const pending = idsOn((await request("/assumptions")).text, "review");
+            check(pending.length > 0, "no pending suggestion to test with");
+            callsBefore = (await aiCalls()).length;
+            const a = await startRehearsal(pending[0]);
+            check(a.location === "/rehearsal?startError=assumption_inactive", `pending: ${a.location}`);
+            const b = await startRehearsal("22222222-2222-2222-2222-222222222222");
+            check(b.location === "/rehearsal?startError=assumption_not_found", `unknown: ${b.location}`);
+            const c = await startRehearsal("not-a-uuid");
+            check(c.location === "/rehearsal?startError=assumption_not_found", `malformed: ${c.location}`);
+            check((await aiCalls()).length === callsBefore, "an AI call was spent on a refused start");
+            const page = await pageOf(a.location);
+            check(page.text.includes("keeping active"), "friendly message missing");
+            const echo = await pageOf("/rehearsal?startError=%3Cscript%3Ealert(1)%3C/script%3E");
+            check(!echo.text.includes("<script>alert"), "query string echoed");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "starting: provider failure and bad scenarios leave no session behind",
+          async () => {
+            for (const [mode, code] of [
+              ["http500", "ai_failed"],
+              ["garbage", "invalid_output"],
+              ["viability", "invalid_output"],
+              ["short", "invalid_output"],
+            ]) {
+              await fake(`/__mode?set=${mode}`);
+              const r = await startRehearsal(rehearsable[0]);
+              check(r.location === `/rehearsal?startError=${code}`, `${mode}: redirected to ${r.location}`);
+            }
+            await fake("/__mode?set=ok");
+            const page = await pageOf("/rehearsal");
+            check(!page.text.includes("Session in progress"), "a failed start left a session");
+            check(page.text.includes("Choose an assumption (3)"), "assumptions disappeared after failed starts");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "starting twice in parallel yields one session",
+          async () => {
+            await fake("/__mode?set=slow&ms=1200");
+            const [a, b] = await Promise.all([startRehearsal(rehearsable[0]), startRehearsal(rehearsable[0])]);
+            await fake("/__mode?set=ok");
+            sessionOne = sessionIdFrom(a.location);
+            check(sessionOne !== "" && a.location === b.location, `redirects differ: ${a.location} vs ${b.location}`);
+            const list = await pageOf("/rehearsal");
+            check(
+              list.text.includes("Session in progress") && list.text.includes(`/rehearsal/${sessionOne}`),
+              "no continue link",
+            );
+            check(!list.text.includes("Choose an assumption"), "start offered while a session is active");
+            const again = await startRehearsal(rehearsable[1]);
+            check(again.location === `/rehearsal/${sessionOne}`, `a second start went to ${again.location}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the session page renders the chat with no scenario in its source or props",
+          async () => {
+            const r = await pageOf(`/rehearsal/${sessionOne}`);
+            check(r.text.includes("Questions used: 0 of 8"), "turn counter missing");
+            check(
+              r.text.includes("Your practice customer is ready") && r.text.includes('id="question"'),
+              "chat missing",
+            );
+            check(r.text.includes("This customer is made up"), "framing missing");
+            check(r.text.includes("Ctrl or Cmd"), "send hint missing");
+            check(
+              !r.text.includes(SCENARIO_MARKER) && !/hidden_truths|current_behaviour/.test(r.text),
+              "scenario leaked",
+            );
+            return r;
+          },
+          { status: 200 },
+        ],
+        [
+          "a question gets an in-character reply; only seq, question and reply are returned",
+          async () => {
+            const r = await ask(sessionOne, "What did you do the last time you needed a trowel?");
+            check(r.status === 200, `status ${r.status}`);
+            check(Object.keys(r.data).sort().join() === "ended,turn", `body keys: ${Object.keys(r.data)}`);
+            check(Object.keys(r.data.turn).sort().join() === "question,reply,seq", "turn keys wrong");
+            check(
+              r.data.turn.seq === 1 && r.data.turn.reply.startsWith("Answer 1:") && r.data.ended === false,
+              "turn wrong",
+            );
+            const [call] = await lastCalls(1);
+            check(call.task === "persona" && call.scenarioInSystem === true, "the model did not receive the scenario");
+            check(call.scenarioInChat === false && call.historyPairs === 0, "scenario in chat turns or wrong history");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the second question carries the first exchange as history",
+          async () => {
+            const r = await ask(sessionOne, "  Why did you pick that one?  ");
+            check(
+              r.status === 200 && r.data.turn.seq === 2 && r.data.turn.reply.startsWith("Answer 2:"),
+              "turn 2 wrong",
+            );
+            check(r.data.turn.question === "Why did you pick that one?", "question not trimmed");
+            const [call] = await lastCalls(1);
+            check(call.historyPairs === 1 && call.scenarioInSystem === true, `history pairs ${call.historyPairs}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "invalid questions and wrong content types are refused without spending",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            for (const [label, question] of [
+              ["empty", ""],
+              ["whitespace", "   \n "],
+              ["too long", "x".repeat(501)],
+              ["not a string", 42],
+            ]) {
+              const r = await ask(sessionOne, question);
+              check(r.status === 400 && r.data?.error === "invalid", `${label}: ${r.status}`);
+            }
+            const missing = await api(sessionApi(sessionOne, "turns"), { json: {} });
+            check(missing.status === 400, `missing: ${missing.status}`);
+            const form = await api(sessionApi(sessionOne, "turns"), {
+              body: "question=hello",
+              contentType: "application/x-www-form-urlencoded",
+            });
+            check(form.status === 415, `form post: ${form.status}`);
+            const plain = await api(sessionApi(sessionOne, "turns"), {
+              body: '{"question":"hi"}',
+              contentType: "text/plain",
+            });
+            check(plain.status === 415, `text/plain: ${plain.status}`);
+            const broken = await api(sessionApi(sessionOne, "turns"), { body: "{not json" });
+            check(broken.status === 400, `malformed JSON: ${broken.status}`);
+            const retryForm = await api(sessionApi(sessionOne, "retry"), { body: "", contentType: "text/plain" });
+            check(retryForm.status === 415, `retry with text/plain: ${retryForm.status}`);
+            check((await aiCalls()).length === callsBefore, "a refused request reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(page.text.includes("Questions used: 2 of 8"), "refused questions consumed the cap");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a failed reply keeps the question, blocks a new one, and a retry does not use another question",
+          async () => {
+            await fake("/__mode?set=http500");
+            const failed = await ask(sessionOne, "Third question, which will fail");
+            check(failed.status === 502 && failed.data.error === "ai_failed", `status ${failed.status}`);
+            check(
+              failed.data.turn?.seq === 3 && failed.data.turn.reply === null,
+              "saved turn missing from the failure",
+            );
+            await fake("/__mode?set=ok");
+            let page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(
+              page.text.includes("Third question, which will fail") && page.text.includes("Try again"),
+              "no retry state",
+            );
+            check(page.text.includes("Questions used: 3 of 8"), "question not counted once");
+            callsBefore = (await aiCalls()).length;
+            const blocked = await ask(sessionOne, "Fourth question while the third is unanswered");
+            check(blocked.status === 409 && blocked.data.error === "reply_pending", `pending: ${blocked.status}`);
+            check((await aiCalls()).length === callsBefore, "a blocked question reached the AI");
+            const retried = await api(sessionApi(sessionOne, "retry"));
+            check(retried.status === 200 && retried.data.turn.seq === 3, `retry: ${retried.status}`);
+            check(retried.data.turn.reply.startsWith("Answer 3:"), "retry reply wrong");
+            page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(page.text.includes("Questions used: 3 of 8"), "retry consumed another question");
+            check(
+              countOf(page.text, "You · question") === 3,
+              `expected 3 questions, saw ${countOf(page.text, "You · question")}`,
+            );
+            const nothing = await api(sessionApi(sessionOne, "retry"));
+            check(
+              nothing.status === 409 && nothing.data.error === "nothing_to_retry",
+              `nothing to retry: ${nothing.status}`,
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a reply that claims validation or leaks the setup is never stored",
+          async () => {
+            await fake("/__mode?set=viability");
+            const bad = await ask(sessionOne, "Fourth question");
+            check(
+              bad.status === 502 && bad.data.error === "invalid_output" && bad.data.turn.reply === null,
+              `viability: ${bad.status}`,
+            );
+            await fake("/__mode?set=leak");
+            const leak = await api(sessionApi(sessionOne, "retry"));
+            check(leak.status === 502 && leak.data.error === "invalid_output", `leak: ${leak.status}`);
+            const page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(!/validated|As an AI/.test(page.text), "a rejected reply reached the page");
+            await fake("/__mode?set=ok");
+            const good = await api(sessionApi(sessionOne, "retry"));
+            check(
+              good.status === 200 && good.data.turn.seq === 4 && good.data.turn.reply.startsWith("Answer 4:"),
+              "recovery failed",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "a double-submit sends one question",
+          async () => {
+            callsBefore = (await aiCalls()).length;
+            await fake("/__mode?set=slow&ms=1200");
+            const [a, b] = await Promise.all([ask(sessionOne, "Fifth question"), ask(sessionOne, "Fifth question")]);
+            await fake("/__mode?set=ok");
+            const statuses = [a.status, b.status].sort();
+            check(statuses.join() === "200,409", `statuses ${statuses}`);
+            check((await aiCalls()).length === callsBefore + 1, "the duplicate reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(page.text.includes("Questions used: 5 of 8"), "double-submit used two questions");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "ending early freezes the transcript, is idempotent, and refuses further questions",
+          async () => {
+            const end = await api(sessionApi(sessionOne, "end"));
+            check(end.status === 200 && end.data.ended === true, `end: ${end.status}`);
+            const again = await api(sessionApi(sessionOne, "end"));
+            check(again.status === 200, `second end: ${again.status}`);
+            callsBefore = (await aiCalls()).length;
+            const late = await ask(sessionOne, "A question after the end");
+            check(late.status === 409 && late.data.error === "not_active", `late question: ${late.status}`);
+            const retry = await api(sessionApi(sessionOne, "retry"));
+            check(retry.status === 409 && retry.data.error === "not_active", `late retry: ${retry.status}`);
+            check((await aiCalls()).length === callsBefore, "an ended session reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionOne}`);
+            check(
+              page.text.includes("Session ended") && page.text.includes("You ended the session early"),
+              "ended copy missing",
+            );
+            check(!page.text.includes('id="question"'), "the question box is still offered");
+            check(
+              page.text.includes("Questions used: 5 of 8") && page.text.includes("Answer 4:"),
+              "transcript missing",
+            );
+            const list = await pageOf("/rehearsal");
+            check(
+              list.text.includes("Past sessions (1)") &&
+                list.text.includes("5 questions") &&
+                list.text.includes("Ended early"),
+              "past session missing",
+            );
+            check(list.text.includes("Choose an assumption (3)"), "a new session cannot be started");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "eight questions end the session automatically and a ninth is refused",
+          async () => {
+            const start = await startRehearsal(rehearsable[1]);
+            sessionTwo = sessionIdFrom(start.location);
+            check(sessionTwo !== "" && sessionTwo !== sessionOne, `second session: ${start.location}`);
+            for (let n = 1; n <= 8; n++) {
+              const r = await ask(sessionTwo, `Question number ${n}`);
+              check(r.status === 200 && r.data.turn.seq === n, `turn ${n}: ${r.status}`);
+              check(r.data.ended === (n === 8), `turn ${n}: ended=${r.data.ended}`);
+            }
+            callsBefore = (await aiCalls()).length;
+            const ninth = await ask(sessionTwo, "Question number 9");
+            check(
+              ninth.status === 409 && ninth.data.error === "not_active",
+              `ninth: ${ninth.status} ${ninth.data?.error}`,
+            );
+            check((await aiCalls()).length === callsBefore, "the ninth question reached the AI");
+            const page = await pageOf(`/rehearsal/${sessionTwo}`);
+            check(
+              page.text.includes("Questions used: 8 of 8") && page.text.includes("You used all your questions"),
+              "cap copy missing",
+            );
+            check(!page.text.includes('id="question"'), "the question box is still offered after the cap");
+            const [call] = await lastCalls(1);
+            check(call.historyPairs === 7, `eighth call saw ${call.historyPairs} earlier pairs`);
+            const end = await api(sessionApi(sessionTwo, "end"));
+            check(end.status === 200, "ending an auto-ended session failed");
+            const list = await pageOf("/rehearsal");
+            check(
+              list.text.includes("Past sessions (2)") && list.text.includes("Ended at the question limit"),
+              "cap session not listed",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "malformed and unknown session ids are handled",
+          async () => {
+            const bad = await api(sessionApi("not-a-uuid", "turns"), { json: { question: "hi" } });
+            check(bad.status === 404, `malformed id: ${bad.status}`);
+            const ghost = await api(sessionApi("33333333-3333-3333-3333-333333333333", "turns"), {
+              json: { question: "hi" },
+            });
+            check(ghost.status === 404 && ghost.data.error === "not_found", `unknown id: ${ghost.status}`);
+            const end = await api(sessionApi("33333333-3333-3333-3333-333333333333", "end"));
+            check(end.status === 404, `unknown end: ${end.status}`);
+            const page = await request("/rehearsal/not-a-uuid");
+            check(page.status === 302 && page.location === "/rehearsal", `malformed page: ${page.status}`);
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "through the real database API a founder cannot read or write the hidden persona",
+          async () => {
+            if (!SUPABASE_URL || !SUPABASE_ANON_KEY)
+              return { status: 200, location: "(skipped: set SUPABASE_URL and SUPABASE_ANON_KEY)" };
+            const token = accessTokenFromJar();
+            const rest = async (path, init = {}) => {
+              const response = await fetch(`${SUPABASE_URL}/rest/v1/${path}`, {
+                ...init,
+                headers: {
+                  apikey: SUPABASE_ANON_KEY,
+                  Authorization: `Bearer ${token}`,
+                  "Content-Type": "application/json",
+                  ...init.headers,
+                },
+              });
+              const text = note(await response.text());
+              return { status: response.status, text };
+            };
+            // Control: the same token can read the founder's own turns, so the refusals below are about the
+            // table, not a bad token.
+            const own = await rest("rehearsal_turns?select=session_id,seq,question,reply");
+            check(
+              own.status === 200 && JSON.parse(own.text).length >= 13,
+              `own turns: ${own.status} ${own.text.slice(0, 80)}`,
+            );
+            const scenarios = await rest("rehearsal_scenarios?select=*");
+            const refused =
+              [401, 403].includes(scenarios.status) || (scenarios.status === 200 && scenarios.text.trim() === "[]");
+            check(refused, `scenarios were readable: ${scenarios.status} ${scenarios.text.slice(0, 80)}`);
+            const forged = await rest("rehearsal_turns", {
+              method: "POST",
+              body: JSON.stringify({ session_id: sessionOne, seq: 8, question: "forged" }),
+            });
+            check([401, 403].includes(forged.status), `a forged turn was accepted: ${forged.status}`);
+            const rewrite = await rest(`rehearsal_turns?session_id=eq.${sessionTwo}`, {
+              method: "PATCH",
+              body: JSON.stringify({ reply: "rewritten" }),
+            });
+            check(
+              [401, 403].includes(rewrite.status) || rewrite.text.trim() === "",
+              `a reply was rewritten: ${rewrite.status}`,
+            );
+            const reopen = await rest(`rehearsal_sessions?id=eq.${sessionOne}`, {
+              method: "PATCH",
+              body: JSON.stringify({ status: "active", ended_reason: null, ended_at: null }),
+            });
+            check([401, 403].includes(reopen.status), `a session was reopened: ${reopen.status}`);
+            const fn = await rest("rpc/rehearsal_add_turn", {
+              method: "POST",
+              body: JSON.stringify({ p_session: sessionOne, p_question: "forged" }),
+            });
+            check([401, 403, 404].includes(fn.status), `a service-only function was callable: ${fn.status}`);
+            const start = await rest("rpc/start_rehearsal_session", {
+              method: "POST",
+              body: JSON.stringify({ p_assumption: rehearsable[2], p_scenario: {} }),
+            });
+            check([401, 403, 404].includes(start.status), `start_rehearsal_session was callable: ${start.status}`);
+            const page = await pageOf(`/rehearsal/${sessionTwo}`);
+            check(countOf(page.text, "You · question") === 8, "the transcript changed through the database API");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "another founder cannot see, send to, retry, end or start from this founder's rehearsal",
+          async () => {
+            const founderA = new Map(jar);
+            try {
+              jar.clear();
+              await request("/api/auth/signup", {
+                method: "POST",
+                form: { email: emailB, password, confirmPassword: password },
+              });
+              const verified = await followEmailedLink(extractLink(await fetchMail(emailB, /confirm/i)));
+              check(verified.location.startsWith("/dashboard"), `second founder not signed in: ${verified.location}`);
+
+              const page = await request(`/rehearsal/${sessionTwo}`);
+              check(page.status === 302 && page.location === "/rehearsal", `page: ${page.status} ${page.location}`);
+              const own = await request("/rehearsal");
+              check(own.status === 302 && own.location === "/project/new", `no project yet: ${own.location}`);
+              for (const action of ["turns", "retry", "end"]) {
+                const r = await api(sessionApi(sessionTwo, action), { json: { question: "intrusion" } });
+                check(r.status === 404 && r.data?.error === "not_found", `${action}: ${r.status}`);
+                check(
+                  !r.text.includes("Question number") && !r.text.includes("Answer "),
+                  `${action} leaked a transcript`,
+                );
+              }
+              callsBefore = (await aiCalls()).length;
+              const start = await startRehearsal(rehearsable[2]);
+              check(start.location === "/rehearsal?startError=assumption_not_found", `start: ${start.location}`);
+              check((await aiCalls()).length === callsBefore, "a stranger's start spent AI");
+            } finally {
+              switchJar(founderA);
+            }
+            const mine = await pageOf(`/rehearsal/${sessionTwo}`);
+            check(mine.status === 200 && mine.text.includes("Questions used: 8 of 8"), "the owner lost access");
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "the hidden scenario never appeared in any page or API response",
+          async () => {
+            check(corpus.length > 40, `only ${corpus.length} bodies were collected`);
+            check(!corpus.some((body) => body.includes(SCENARIO_MARKER)), "the scenario marker leaked to a client");
+            check(
+              !corpus.some((body) => /hidden_truths|assumption_reality|speaking_style/.test(body)),
+              "scenario field names leaked",
+            );
+            const personaCalls = (await aiCalls()).filter((c) => c.task === "persona");
+            check(personaCalls.length >= 14, `only ${personaCalls.length} persona calls`);
+            check(
+              personaCalls.every((c) => c.scenarioInSystem && !c.scenarioInChat),
+              "the model did not always receive the scenario in the system prompt only",
+            );
+            return { status: 200, location: "" };
+          },
+          { status: 200 },
+        ],
+        [
+          "every provider call asked for zero data retention, and JSON mode where it expects JSON",
           async () => {
             const calls = await aiCalls();
             check(calls.length > 0, "no provider calls recorded");
@@ -731,13 +1266,19 @@ const steps = [
               calls.every((c) => c.dataCollection === "deny"),
               "a call lacked data_collection=deny",
             );
+            // Every call is authorised and one of the known tasks; all but persona replies ask for JSON mode.
             check(
-              calls.every((c) => c.jsonMode && c.authorised && ["draft", "suggest"].includes(c.task)),
+              calls.every(
+                (c) =>
+                  c.authorised &&
+                  ["draft", "suggest", "scenario", "persona"].includes(c.task) &&
+                  c.jsonMode === (c.task !== "persona"),
+              ),
               "unexpected call shape",
             );
             check(
-              calls.some((c) => c.task === "suggest"),
-              "no suggest calls recorded",
+              ["suggest", "scenario", "persona"].every((task) => calls.some((c) => c.task === task)),
+              "a task kind was never called",
             );
             return { status: 200, location: "" };
           },

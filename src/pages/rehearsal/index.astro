@@ -1,0 +1,138 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { getCurrentProject } from "@/lib/services/project";
+import { getActiveSession, listRehearsableAssumptions, listSessions } from "@/lib/services/rehearsals";
+import { REHEARSAL_TURN_CAP } from "@/lib/services/rehearsal-persona";
+import { createClient } from "@/lib/supabase";
+
+const supabase = createClient(Astro.request.headers, Astro.cookies);
+const project = supabase ? await getCurrentProject(supabase) : null;
+if (!supabase || !project) return Astro.redirect("/project/new");
+
+const [active, assumptions, sessions] = await Promise.all([
+  getActiveSession(supabase, project.id),
+  listRehearsableAssumptions(supabase, project.id),
+  listSessions(supabase, project.id),
+]);
+const activeSummary = sessions.find((session) => session.id === active?.id);
+const past = sessions.filter((session) => session.status === "ended");
+
+// Only known codes are rendered; the query string is never echoed back.
+const START_ERRORS: Record<string, string | undefined> = {
+  ai_failed: "We couldn't prepare your practice customer just now. Nothing was lost. Try again in a moment.",
+  invalid_output: "Your practice customer didn't come out right. Nothing was lost. Try again.",
+  assumption_not_found: "We couldn't find that assumption. Refresh the page.",
+  assumption_inactive: "Only an assumption you are keeping active can be rehearsed.",
+  server_error: "Something went wrong on our side. Nothing was lost. Try again.",
+};
+const startError = START_ERRORS[Astro.url.searchParams.get("startError") ?? ""];
+
+const ENDED_LABEL = { cap: "Ended at the question limit", user: "Ended early" } as const;
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
+---
+
+<Layout title="Rehearsal" current="rehearsal">
+  <div class="mx-auto w-[min(1180px,100%-32px)] py-10 sm:py-14">
+    <div class="eyebrow mb-5">
+      <i></i> Rehearsal
+    </div>
+    <h1 class="disp text-[clamp(2.2rem,5.5vw,3.8rem)]">Practise the interview</h1>
+    <p class="mt-4 max-w-[62ch] text-ink-soft">
+      Pick one of your assumptions. We prepare a made-up customer you can't see in advance, and you interview them with
+      up to {REHEARSAL_TURN_CAP} questions. They are there to help you practise asking, not to judge your idea, and what
+      they say is not evidence that your idea will work.
+    </p>
+
+    {startError && (
+      <p role="alert" class="notice notice-error mt-8 max-w-3xl">
+        {startError}
+      </p>
+    )}
+
+    {active ? (
+      <section class="card mt-8 max-w-3xl p-6 sm:p-8" aria-labelledby="active-heading">
+        <h2 id="active-heading" class="disp text-3xl">
+          Session in progress
+        </h2>
+        {activeSummary && (
+          <p class="mt-3 text-ink-soft">
+            <span class="label">Rehearsing</span>
+            {activeSummary.assumption_statement}
+          </p>
+        )}
+        <p class="mono-note mt-3">
+          {activeSummary?.turn_count ?? 0} of {REHEARSAL_TURN_CAP} questions used. You can only have one session at a
+          time.
+        </p>
+        <a href={`/rehearsal/${active.id}`} class="btn btn-yellow mt-5">
+          Continue
+        </a>
+      </section>
+    ) : assumptions.length > 0 ? (
+      <section class="mt-10" aria-labelledby="pick-heading">
+        <h2 id="pick-heading" class="slabel mb-6">
+          Choose an assumption ({assumptions.length})
+        </h2>
+        <ul class="grid gap-6 lg:grid-cols-2">
+          {assumptions.map((assumption) => (
+            <li class="card-flat p-5 sm:p-6">
+              <form method="POST" action="/api/rehearsal/sessions" class="flex h-full flex-col gap-4" data-pending>
+                <input type="hidden" name="assumptionId" value={assumption.id} />
+                <p class="text-[17px] font-bold leading-snug">{assumption.statement}</p>
+                {assumption.risk_note && (
+                  <p class="text-[15px] text-ink-soft">Why it is risky: {assumption.risk_note}</p>
+                )}
+                <div class="mt-auto flex flex-wrap items-center gap-4">
+                  <button type="submit" class="btn btn-yellow">
+                    Start rehearsal
+                  </button>
+                  <p data-pending-status hidden role="status" class="mono-note">
+                    Preparing your practice customer. This can take up to 30 seconds. Please keep this page open.
+                  </p>
+                </div>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </section>
+    ) : (
+      <section class="card mt-8 max-w-3xl p-6 sm:p-8">
+        <h2 class="disp text-3xl">Keep an assumption first</h2>
+        <p class="mt-3 text-ink-soft">
+          Rehearsal needs an assumption you have kept and not retired. Review the AI's suggestions and keep the ones
+          worth testing.
+        </p>
+        <a href="/assumptions" class="btn btn-yellow mt-5">
+          Go to your assumptions
+        </a>
+      </section>
+    )}
+
+    {past.length > 0 && (
+      <section class="mt-12" aria-labelledby="past-heading">
+        <h2 id="past-heading" class="slabel mb-6">
+          Past sessions ({past.length})
+        </h2>
+        <ul class="grid gap-6 lg:grid-cols-2">
+          {past.map((session) => (
+            <li class="card-flat flex flex-col gap-2 p-5">
+              <p class="text-[15px] font-bold leading-snug">{session.assumption_statement}</p>
+              <p class="mono-note">
+                {formatDate(session.created_at)} · {session.turn_count}{" "}
+                {session.turn_count === 1 ? "question" : "questions"} · {ENDED_LABEL[session.ended_reason ?? "user"]}
+              </p>
+              <a href={`/rehearsal/${session.id}`} class="link mt-1 self-start">
+                View transcript
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </div>
+</Layout>
+
+<script>
+  import "@/scripts/pending-forms";
+</script>

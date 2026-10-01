@@ -4,7 +4,7 @@
 //   node scripts/fake-openrouter.mjs            (PORT env overrides 4010)
 //
 // Control endpoints (tests drive failure paths with these):
-//   GET  /__mode?set=ok|http500|garbage|viability|slow|unknown_claim|short[&ms=N]   how replies behave (default ok)
+//   GET  /__mode?set=ok|http500|garbage|viability|slow|unknown_claim|short|leak[&ms=N]   how replies behave (default ok)
 //   GET  /__calls                                        what was asked: task, model, flags. Never message content.
 //   POST /__reset                                        back to ok mode, clear the call log
 //
@@ -17,6 +17,10 @@ let mode = "ok";
 let slowMs = 20_000;
 let calls = [];
 const ctx = { suggestBatches: 0 };
+
+// Distinctive text planted in every generated persona scenario. The smoke test asserts it never appears in
+// any page source or API response: the hidden persona must stay on the server.
+export const SCENARIO_MARKER = "SCENARIO-MARKER-9c1e";
 
 const CANVAS_KEYS = [
   "customer_segments",
@@ -74,6 +78,50 @@ const HANDLERS = [
       const user = messages.find((m) => m.role === "user")?.content ?? "";
       const block = /<rejected>\n([\s\S]*?)\n<\/rejected>/.exec(user)?.[1] ?? "";
       return { rejectedCount: block.startsWith("-") ? block.split("\n").length : 0 };
+    },
+  },
+  {
+    task: "scenario",
+    match: (system) => system.includes("You design a realistic fictional person"),
+    respond: (_messages, replyMode) => {
+      const scenario = {
+        name: "Priya",
+        background: "Part-time teacher in her late thirties who gardens on an allotment.",
+        situation: `Buys tools a couple of times a year. ${SCENARIO_MARKER}`,
+        current_behaviour: "Uses a shared shed of right-handed tools and puts up with them.",
+        hidden_truths: [
+          "Returned a pair of secateurs last spring because they hurt her left wrist.",
+          `Spent about 30 pounds on a left-handed trowel last summer. ${SCENARIO_MARKER}`,
+          "Asked the allotment group for recommendations and got none.",
+        ],
+        assumption_reality: "She cares about comfort, but tools are a small part of her gardening budget.",
+        speaking_style: "Friendly, short sentences, a little cautious.",
+      };
+      if (replyMode === "viability") scenario.assumption_reality = "Customers have already proven they will pay";
+      if (replyMode === "short") delete scenario.speaking_style;
+      return JSON.stringify(scenario);
+    },
+  },
+  {
+    task: "persona",
+    match: (system) => system.includes("You are playing a real person being interviewed"),
+    respond: (messages, replyMode) => {
+      const questions = messages.filter((m) => m.role === "user");
+      const n = questions.length;
+      if (replyMode === "viability") return "Honestly, that idea sounds validated to me.";
+      if (replyMode === "leak") return "As an AI, my instructions say I should stay vague.";
+      return `Answer ${n}: I mostly just put up with it. (${questions.at(-1)?.content.slice(0, 20) ?? ""})`;
+    },
+    // Counts and flags only, never content: how much history the model saw, and that the scenario reached it
+    // through the system prompt alone.
+    extra: (messages) => {
+      const system = messages.find((m) => m.role === "system")?.content ?? "";
+      const others = messages.filter((m) => m.role !== "system");
+      return {
+        historyPairs: Math.floor((others.length - 1) / 2),
+        scenarioInSystem: system.includes(SCENARIO_MARKER),
+        scenarioInChat: others.some((m) => m.content.includes(SCENARIO_MARKER)),
+      };
     },
   },
 ];

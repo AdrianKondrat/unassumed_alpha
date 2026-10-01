@@ -180,7 +180,7 @@ It needs a reachable Supabase instance (local or cloud) with email confirmation 
 
 GitHub Actions (`.github/workflows/ci.yml`) runs on every push and PR to `master` and `mvp`:
 
-- **ci** — lint, `astro check`, `npm run test:ai` and build. Configure `SUPABASE_URL`, `SUPABASE_KEY` and `OPENROUTER_API_KEY` as repository secrets for the build step.
+- **ci** — lint, `astro check`, `npm run test:ai` and build. Configure `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY` and `OPENROUTER_API_KEY` as repository secrets for the build step.
 - **smoke** — starts a local Supabase via the Supabase CLI, builds, serves the production preview on the Cloudflare runtime and runs `npm run smoke` against it. No secrets required.
 - **deploy** — only on a push to `mvp`, and only after `ci` and `smoke` pass. See [MVP deploy](#mvp-deploy).
 
@@ -197,15 +197,17 @@ Pushing to the `mvp` branch deploys the app as the Cloudflare Worker **`unassume
    - Authentication → SMTP: configure a real SMTP provider (the built-in mailer is heavily rate-limited and only sends to team members).
 2. **GitHub repository secrets** (Settings → Secrets and variables → Actions):
 
-   | Secret                                                                         | Purpose                                                                                                                   |
-   | ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-   | `CLOUDFLARE_API_TOKEN`                                                         | API token with _Workers Scripts: Edit_ and _Workers KV Storage: Edit_ (the Astro adapter binds a `SESSION` KV namespace). |
-   | `CLOUDFLARE_ACCOUNT_ID`                                                        | Your Cloudflare account id.                                                                                               |
-   | `SUPABASE_URL`, `SUPABASE_KEY`                                                 | Hosted MVP project URL and `anon` key (also set as Worker runtime secrets by the deploy job).                             |
-   | `OPENROUTER_API_KEY`                                                           | OpenRouter key for all AI calls (also set as a Worker runtime secret).                                                    |
-   | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` (opt.) | When all three exist, the deploy job runs `supabase db push` before deploying so the schema never lags the code.          |
+   | Secret                         | Purpose                                                                                                                   |
+   | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+   | `CLOUDFLARE_API_TOKEN`         | API token with _Workers Scripts: Edit_ and _Workers KV Storage: Edit_ (the Astro adapter binds a `SESSION` KV namespace). |
+   | `CLOUDFLARE_ACCOUNT_ID`        | Your Cloudflare account id.                                                                                               |
+   | `SUPABASE_URL`, `SUPABASE_KEY` | Hosted MVP project URL and `anon` key (also set as Worker runtime secrets by the deploy job).                             |
 
-   The deploy job fails fast with the list of any missing required secret.
+| `SUPABASE_SERVICE_ROLE_KEY` | Hosted project `service_role` key (Settings → API). Server-only: reads the hidden rehearsal persona. Never put it in the browser. |
+| `OPENROUTER_API_KEY` | OpenRouter key for all AI calls (also set as a Worker runtime secret). |
+| `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` (opt.) | When all three exist, the deploy job runs `supabase db push` before deploying so the schema never lags the code. |
+
+The deploy job fails fast with the list of any missing required secret.
 
 3. Make sure the `mvp` branch exists on GitHub, then push to it.
 

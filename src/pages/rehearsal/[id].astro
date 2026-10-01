@@ -1,0 +1,58 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import { RehearsalChat } from "@/components/rehearsal/RehearsalChat";
+import { toPublicTurn } from "@/lib/services/rehearsal-http";
+import { QUESTION_MAX_LENGTH, REHEARSAL_TURN_CAP } from "@/lib/services/rehearsal-persona";
+import { getAssumptionStatement, getSession, listTurns } from "@/lib/services/rehearsals";
+import { createClient } from "@/lib/supabase";
+import { z } from "zod";
+
+const supabase = createClient(Astro.request.headers, Astro.cookies);
+const id = z.uuid().safeParse(Astro.params.id);
+if (!supabase || !id.success) return Astro.redirect("/rehearsal");
+
+// RLS scopes this to the founder's own sessions; anyone else's id is simply not found.
+const session = await getSession(supabase, id.data);
+if (!session) return Astro.redirect("/rehearsal");
+
+const [turns, assumption] = await Promise.all([
+  listTurns(supabase, session.id),
+  getAssumptionStatement(supabase, session.assumption_id),
+]);
+// Only seq, question and reply ever become page props; the hidden scenario is unreachable from here.
+const initialTurns = turns.map(toPublicTurn);
+---
+
+<Layout title="Rehearsal session" current="rehearsal">
+  <div class="mx-auto w-[min(820px,100%-32px)] py-10 sm:py-14">
+    <a href="/rehearsal" class="link text-[15px]">
+      All rehearsals
+    </a>
+    <div class="eyebrow mb-5 mt-6">
+      <i></i> Rehearsal · {session.status === "active" ? "In progress" : "Ended"}
+    </div>
+    <h1 class="disp text-[clamp(1.8rem,4.5vw,2.8rem)]">Interview your practice customer</h1>
+
+    <div class="mt-6">
+      <p class="label">The assumption you are practising on</p>
+      <p class="text-[17px] font-bold leading-snug">{assumption}</p>
+    </div>
+    <p class="notice notice-info mt-6">
+      <strong>This customer is made up.</strong> What they say shows you how to practise asking good questions. It isn't
+      evidence about your idea.
+    </p>
+
+    <div class="mt-8">
+      <RehearsalChat
+        client:load
+        sessionId={session.id}
+        assumption={assumption}
+        turnCap={REHEARSAL_TURN_CAP}
+        questionMaxLength={QUESTION_MAX_LENGTH}
+        initialTurns={initialTurns}
+        initialStatus={session.status}
+        initialEndedReason={session.ended_reason}
+      />
+    </div>
+  </div>
+</Layout>

@@ -53,7 +53,7 @@ Navigation aid — groups items that share a Prerequisites chain. Canonical orde
 
 ## Baseline
 
-> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01, S-02 and S-04 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
+> Superseded by progress on `mvp`: F-01, F-02, F-03, S-01, S-02, S-04 and S-05 are implemented (see `## Done` and `context/foundation/handoff.md`). The baseline below is the original 2026-09-27 starting point.
 
 What's already in place in the codebase as of 2026-09-27 (auto-researched + user-confirmed). Foundations below assume these are present and do NOT re-scaffold them.
 
@@ -165,14 +165,14 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **Blockers:** —
 - **Unknowns:** —
 - **Risk:** The hidden-persona system is the riskiest, most novel piece of the release; the PRD's own fallback (curated response templates) is an explicit option here if usability targets are missed under the capacity constraint.
-- **Status:** ready — next to build (S-02 and S-04 are done). Settled design decisions and the implementation checklist are in `context/foundation/handoff.md` ("RESUME HERE: S-05").
+- **Status:** done — implemented on `mvp`. Writes go through service-role-only database functions and the scenario table is unreadable by every client role. Live-model check pending (persona quality and latency are unverified; see handoff).
 
 ### S-06: Rehearsal scorecard _(north star)_
 
 - **Outcome:** after ending a session, founder automatically sees a scorecard flagging leading/hypothetical/solution-biased/past-behavior/specificity issues, citing the exact triggering turns, with at least one concrete rewrite suggestion and a visible "beta scoring" disclaimer — never stating or implying the idea is "validated."
 - **Change ID:** rehearsal-scorecard
 - **PRD refs:** FR-015, FR-016, US-01
-- **Prerequisites:** S-05, F-02
+- **Prerequisites:** S-05 (done), F-02
 - **Parallel with:** —
 - **Blockers:** —
 - **Unknowns:**
@@ -203,7 +203,7 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 | S-02       | ai-drafted-canvas-from-brief               | Project creation + AI-drafted canvas                             | done                  | Implemented                                        |
 | S-03       | manual-canvas-editing-with-conflict-safety | Manual canvas editing with conflict-safe saves                   | no                    | Ready after S-02; reconcile plan first             |
 | S-04       | assumption-suggestion-and-lifecycle        | AI-suggested assumptions + accept/edit/reject + lifecycle status | done                  | Implemented                                        |
-| S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | no                    | Ready after S-04; reconcile plan first             |
+| S-05       | rehearsal-session-turn-exchange            | Hidden-persona rehearsal session turn exchange                   | done                  | Implemented                                        |
 | S-06       | rehearsal-scorecard                        | Automatic post-session scorecard with cited flags                | no                    | Ready after S-05; Unknown resolved; reconcile plan |
 | S-07       | resumable-rehearsal-sessions               | Idempotent resume for disrupted rehearsal sessions               | no                    | Plan exists; after S-05                            |
 
@@ -228,4 +228,5 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **S-01 verified-account-and-workspace** — mandatory email verification, resend, password reset, workspace landing, brand foundation, end-to-end smoke test. 2026-10-01.
 - **S-02 ai-drafted-canvas-from-brief** — one project from a brief, AI-drafted 9-block canvas with distinct AI-draft markers, DB-enforced one-project cap, race-safe drafting lease. 2026-10-01 (live-key check pending).
 - **S-04 assumption-suggestion-and-lifecycle** — AI-suggested candidates, accept / edit / reject gate, manual lifecycle status, DB-enforced transition rules, atomic batch insert. 2026-10-01 (live-key check pending).
+- **S-05 rehearsal-session-turn-exchange** — hidden-persona rehearsal: start on an active assumption, up to 8 questions, retry without losing a question, end early or automatically at the cap; persona scenario unreadable by any client (DB privileges + RLS), writes via service-only DB functions. 2026-10-01 (live-key check pending).
 - **F-03 mvp-branch-deploy-pipeline** — built, awaiting first real deploy (see item status).

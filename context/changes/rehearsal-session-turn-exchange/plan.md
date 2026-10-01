@@ -1,5 +1,7 @@
 # Rehearsal Session Turn Exchange Implementation Plan
 
+> **Implemented on `mvp` (2026-10-01, session 3).** Deviations from this plan, and what is still unverified, are listed under "Implementation notes" at the end of the Progress section. The START HERE and RECONCILE banners below are kept as written for the record.
+>
 > **START HERE (updated 2026-10-01, end of session 2):** S-02 and S-04 are implemented. Read `context/foundation/handoff.md` section "RESUME HERE: S-05" first: it records the settled design decisions (DB functions for leases, two clients, service-role secret wiring incl. the CI deploy job, reuse of `src/lib/ai-output.ts`, fake-provider and smoke requirements, next migration timestamp `20261001100400`). Nothing of S-05 is written yet.
 >
 > **RECONCILE BEFORE IMPLEMENTING (written 2026-10-01).** (1) S-04 now has a plan: `public.assumptions(id, project_id, statement, risk_note, status in ('suggested','rejected','active','superseded','retired'), …)`. The column is **`statement`, not `text`**, and a rehearsable assumption is `status = 'active'`. Update the FK/list query/prompt inputs accordingly (`buildScenarioMessages({ brief, assumption })` takes the statement). (2) `complete()` already exists (F-02) and supports `jsonMode`, `timeoutMs` and `retry`: use `jsonMode: true` for scenario generation. (3) `SUPABASE_SERVICE_ROLE_KEY` is new: add it to `astro.config.mjs` env schema, `.env.example`, the CI `ci` build env, **and the `deploy` job** (`secrets:` list + env + required-secrets check in `.github/workflows/ci.yml`) and README "MVP deploy". (4) Reuse S-02's `is_project_member()` helper and its banned-word list (`validated`/`proven`) rather than duplicating.
@@ -360,11 +362,11 @@ No existing data; new tables in a pre-launch project. If S-04 lands with differe
 
 #### Automated
 
-- [ ] 1.1 Migration applies on a fresh DB: `npx supabase db reset`
+- [x] 1.1 Migration applies on a fresh DB: `npx supabase db reset` (applied with `stack.sh reset`, see notes)
 - [ ] 1.2 No migration lint errors: `npx supabase db lint`
-- [ ] 1.3 SQL assertions pass: `psql ... -f supabase/tests/rehearsal_sessions.sql`
-- [ ] 1.4 Type checking passes: `npx astro check`
-- [ ] 1.5 Linting passes: `npm run lint`
+- [x] 1.3 SQL assertions pass: `psql ... -f supabase/tests/rehearsal_sessions.sql`
+- [x] 1.4 Type checking passes: `npx astro check`
+- [x] 1.5 Linting passes: `npm run lint`
 
 #### Manual
 
@@ -374,10 +376,10 @@ No existing data; new tables in a pre-launch project. If S-04 lands with differe
 
 #### Automated
 
-- [ ] 2.1 Fixture tests pass: `npm run test:rehearsal`
-- [ ] 2.2 Type checking passes: `npx astro check`
-- [ ] 2.3 Linting passes: `npm run lint`
-- [ ] 2.4 Build passes: `npm run build`
+- [x] 2.1 Fixture tests pass: `npm run test:rehearsal`
+- [x] 2.2 Type checking passes: `npx astro check`
+- [x] 2.3 Linting passes: `npm run lint`
+- [x] 2.4 Build passes: `npm run build`
 
 #### Manual
 
@@ -387,9 +389,9 @@ No existing data; new tables in a pre-launch project. If S-04 lands with differe
 
 #### Automated
 
-- [ ] 3.1 Type checking passes: `npx astro check`
-- [ ] 3.2 Linting passes: `npm run lint`
-- [ ] 3.3 Build passes with `SUPABASE_SERVICE_ROLE_KEY` unset: `npm run build`
+- [x] 3.1 Type checking passes: `npx astro check`
+- [x] 3.2 Linting passes: `npm run lint`
+- [x] 3.3 Build passes with `SUPABASE_SERVICE_ROLE_KEY` unset: `npm run build`
 
 #### Manual
 
@@ -400,30 +402,43 @@ No existing data; new tables in a pre-launch project. If S-04 lands with differe
 
 #### Automated
 
-- [ ] 4.1 Type checking passes: `npx astro check`
-- [ ] 4.2 Linting passes: `npm run lint`
-- [ ] 4.3 Build passes: `npm run build`
-- [ ] 4.4 Smoke test still passes: `npm run smoke`
+- [x] 4.1 Type checking passes: `npx astro check`
+- [x] 4.2 Linting passes: `npm run lint`
+- [x] 4.3 Build passes: `npm run build`
+- [x] 4.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
-- [ ] 4.5 curl checks: 9th question 409, pending-reply 409, unauthenticated 401, other founder's session 404
-- [ ] 4.6 No response body or server log contains scenario text
+- [x] 4.5 curl checks: 9th question 409, pending-reply 409, unauthenticated 401, other founder's session 404 (done by `npm run smoke` over HTTP)
+- [x] 4.6 No response body or server log contains scenario text (bodies: smoke; worker log scanned by hand)
 
 ### Phase 5: UI
 
 #### Automated
 
-- [ ] 5.1 Type checking passes: `npx astro check`
-- [ ] 5.2 Linting passes: `npm run lint`
-- [ ] 5.3 Build passes: `npm run build`
-- [ ] 5.4 Smoke test still passes: `npm run smoke`
+- [x] 5.1 Type checking passes: `npx astro check`
+- [x] 5.2 Linting passes: `npm run lint`
+- [x] 5.3 Build passes: `npm run build`
+- [x] 5.4 Smoke test still passes: `npm run smoke`
 
 #### Manual
 
-- [ ] 5.5 Full 8-turn flow auto-ends and shows a read-only transcript
-- [ ] 5.6 Early end after 2 questions shows a 2-turn transcript
-- [ ] 5.7 Forced AI failure shows Retry; retry yields a reply without adding a turn
-- [ ] 5.8 Mid-session refresh shows every saved turn exactly once
-- [ ] 5.9 No scenario text in page source or Network tab
+- [x] 5.5 Full 8-turn flow auto-ends and shows a read-only transcript (smoke over HTTP against the fake provider; the browser run covered 3 turns)
+- [x] 5.6 Early end after 2 questions shows a 2-turn transcript (browser run ended after 3, smoke after 5)
+- [x] 5.7 Forced AI failure shows Retry; retry yields a reply without adding a turn
+- [x] 5.8 Mid-session refresh shows every saved turn exactly once (server-rendered; smoke reloads the page after each step)
+- [x] 5.9 No scenario text in page source or Network tab (page source and every API body checked by smoke; Network tab not opened by hand)
 - [ ] 5.10 Persona stays in character, never uses viability wording, replies in about 8s typically
+
+### Implementation notes (deviations and unverified items)
+
+- **Verification environment.** As for S-02/S-04: no Docker, so the migration was applied with `scripts/sandbox-stack/stack.sh reset` (real Postgres 16 + PostgREST + GoTrue). Not run: `supabase db lint` (1.2) and the Studio policy view (1.6); CI's `smoke` job runs all SQL assertions on the real Supabase CLI. **The real model has never been called** (`openrouter.ai` is blocked here), so 2.5 and 5.10 (persona quality, in-character behaviour, reply latency, `gpt-4o-mini` as the persona model) and 3.5 (a scratch run against a real key) remain open, and 3.4 (adding `SUPABASE_SERVICE_ROLE_KEY` as a GitHub secret and Worker secret) is the user's action.
+- **Writes are database functions, not row updates.** Founders have `SELECT` only on sessions and turns and **no privilege at all** on `rehearsal_scenarios` (RLS on, no policies, privileges revoked from `anon` and `authenticated`: two independent layers, each asserted on its own). The server writes through four service-role-only functions: `start_rehearsal_session(assumption, scenario)` (session + scenario atomically, active assumptions only), `rehearsal_add_turn(session, question)` (row-locks the session; decides `reply_pending` / `cap_reached` / `not_active` and assigns `seq` under the lock), `rehearsal_store_reply(session, seq, reply)` (stores once and ends the session with `ended_reason = 'cap'` in the same transaction at the 8th reply; a late reply after the founder ended the session is stored without rewriting the reason) and `rehearsal_end_session(session, reason)`. This replaces the plan's "compute seq in the app and rely on the unique violation". 10 parallel `rehearsal_add_turn` calls produce exactly one turn (tested by hand with real connections; a single transaction cannot test the lock).
+- **Mutation-checked.** The SQL script was shown to fail for 28 deliberate breakages (index, grants, policies, constraints, function logic incl. the late-reply rule); the offline test for 13; the smoke test for 4 app-level breakages (scenario leaking into page props, a missing ownership check, a dropped content-type gate, a disabled reply guard). One gap found and closed by this: execute grants were only covered indirectly, so the script now asserts them with `has_function_privilege`.
+- **Service-role wiring.** `SUPABASE_SERVICE_ROLE_KEY` is declared in `astro.config.mjs`, `.env.example`, README, the CI `ci` build env, the `deploy` job (secrets list, job env, required-secrets check) and the `smoke` job's `.env` (from `supabase status -o env`). `src/lib/supabase-admin.ts` is the only consumer; a "Setup needed" banner (`config-status.ts`) shows when it is unset. The build passes with it unset.
+- **Two clients as planned.** The founder's RLS client does every ownership check and is the one given to `complete()`; the service client only reads the scenario and calls the four functions, after an RLS read has proved ownership (an id the founder cannot see is `not_found`). RPC payloads are validated with zod rather than cast (`rpc().overrideTypes` does not type object payloads on an untyped client; `astro check` caught this, ESLint did not).
+- **Start is a plain form POST**, like the other slow AI actions (`POST /api/rehearsal/sessions` with `assumptionId`, `data-pending`, redirect to `/rehearsal/[id]` or `/rehearsal?startError=<code>`), not a JSON route. Turns, retry and end are JSON routes. They require `Content-Type: application/json` (415 otherwise), which also stops cross-site form posts riding on the founder's cookie. All response bodies are built from an allow-list (`toPublicTurn`: `seq`, `question`, `reply`).
+- **Start race.** Two parallel starts both generate a scenario (two AI calls, as the plan accepted); the loser's insert hits the one-active-session index, is mapped to "join the winner", and both redirect to the same session. Smoke asserts this.
+- **Persona design.** Scenario fields: name, background, situation, current behaviour, 3-5 hidden truths (past events), how the assumption honestly plays out, speaking style; the generator is told the persona must be neither a confirmer nor hostile. The persona answers past-behaviour questions with one concrete detail at a time, and leading/hypothetical/solution-pitching questions with polite non-committal answers. `guardReply` also rejects endorsement wording ("guaranteed to work", "will definitely succeed") and setup leaks ("as an AI", "my instructions", scenario field names), beyond the shared "validated"/"proven" check; a rejected reply is not stored and shows the normal Retry state. Scenario generation uses `converse` with a 20 s timeout and `jsonMode`.
+- **Additions beyond the plan.** `src/lib/services/rehearsals.ts` (RLS-only reads, so pages never import the service client), `rehearsal-http.ts` (status mapping, public-turn allow-list, content-type gate) and `rehearsal-route.ts` (shared route plumbing), a "Past sessions" list on `/rehearsal` (an ended session would otherwise be unreachable), a "Rehearsal" nav item and a live dashboard card, 3 extra offline checks (17 total), and 21 new smoke steps (4 anonymous guards, then refused starts spend nothing, failure modes at start, parallel start, history grows, validation and content types, saved question + Retry + pending-reply refusal, bad replies never stored, double-submit, early end, 8-turn auto-end and refused 9th, bad ids, a real-PostgREST privacy check using the founder's own JWT, a second founder's 404s, the scenario marker absent from every collected body). The smoke test needs `SUPABASE_URL` and `SUPABASE_ANON_KEY` for the PostgREST step (CI passes them; it is skipped without them).
+- **Reconciliation for S-06 / S-07** (names as shipped): `rehearsal_sessions(id, project_id, assumption_id, status, ended_reason in ('user','cap'), created_at, ended_at)`, `rehearsal_turns(session_id, seq, question, reply, created_at, replied_at)`; service functions `startSession` / `sendTurn` / `retryReply` / `endSession` in `rehearsal-service.ts` take `{ supabase, admin, founderId, ... }`. S-07 should replace the `rehearsal_add_turn` / `rehearsal_store_reply` internals (idempotency key, `reply_started_at` lease, `last_activity_at`, `'expired'` end reason) as an additive migration; the lock-and-decide shape is already in the database functions.
