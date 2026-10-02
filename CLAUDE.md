@@ -96,6 +96,7 @@ Full server-side rendering (`output: "server"` in astro.config.mjs). All pages a
 - **shadcn/ui**: components live in `src/components/ui/`, "new-york" style variant. Install new ones with `npx shadcn@latest add [name]`.
 - **API routes**: use uppercase `GET`, `POST` exports; validate input with zod.
 - **Supabase migrations**: `supabase/migrations/` using naming format `YYYYMMDDHHmmss_short_description.sql`. Always enable RLS on new tables with granular per-operation, per-role policies.
+- **Explicit privileges**: never rely on Supabase's default grants (a hosted-project setting). Each migration that adds a table or function states its own `grant`/`revoke` (`authenticated` gets exactly what its policies allow, `service_role` full access if server code uses it, functions `revoke ... from public, anon`). Add the new objects to the lists at the top of `supabase/checks/hosted_verification.sql` (CI requires `ALL PASS`), and prove it with `scripts/sandbox-stack/check-without-default-grants.sh`. Hosted setup is documented in `supabase/HOSTED_SETUP.md`.
 - **React**: no Next.js directives ("use client" etc.). Extract hooks to `src/components/hooks/`.
 - **Services/helpers** go in `src/lib/` (or `src/lib/services/` for extracted business logic).
 - **Shared types** (entities, DTOs) go in `src/types.ts`.

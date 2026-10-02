@@ -136,12 +136,7 @@ Pushing to `mvp` runs CI and, once the secrets below exist, deploys the Cloudfla
 
 ### One-time setup
 
-1. **Hosted Supabase project.** In the dashboard:
-   - Authentication → URL Configuration: set _Site URL_ to the deployed Worker URL and add `<worker url>/auth/callback` to _Redirect URLs_.
-   - Authentication → Providers → Email: keep _Confirm email_ **on** (verification is required) and set the minimum password length to 8.
-   - Authentication → Emails → Templates: paste `supabase/templates/confirmation.html` into _Confirm sign up_ and `supabase/templates/recovery.html` into _Reset password_ (subjects "Confirm your email address" / "Reset your password"). They link to `/auth/callback?token_hash=…`, so verification works when the email is opened on another device.
-   - Authentication → SMTP: configure a real provider (the built-in mailer is heavily rate-limited).
-   - Apply the migrations in `supabase/migrations` (the deploy job can do it: see the optional secrets).
+1. **Hosted Supabase project.** Follow [`supabase/HOSTED_SETUP.md`](supabase/HOSTED_SETUP.md) step by step: create the project, apply the 9 migrations, configure auth (Site URL, email templates, SMTP, confirm email, password length 8) and run the read-only readiness check `supabase/checks/hosted_verification.sql`. This has **not been done yet**; nothing exists on the hosted project until you do.
 2. **GitHub repository secrets** (Settings → Secrets and variables → Actions):
 
    | Secret                                                                         | Purpose                                                                                                               |

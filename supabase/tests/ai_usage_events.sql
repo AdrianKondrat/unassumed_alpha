@@ -41,12 +41,18 @@ begin
   if n <> 1 then raise exception 'A should see exactly 1 usage row, saw %', n; end if;
 
   -- Append-only: update and delete affect nothing (no policies).
-  update public.ai_usage_events set total_tokens = 0;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'update on ledger changed % rows', n; end if;
-  delete from public.ai_usage_events;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'delete on ledger removed % rows', n; end if;
+  begin
+    update public.ai_usage_events set total_tokens = 0;
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'update on ledger changed % rows', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
+  begin
+    delete from public.ai_usage_events;
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'delete on ledger removed % rows', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
 end $$;
 
 -- Founder B sees none of A's rows.

@@ -1,6 +1,35 @@
-# Handoff: state of the MVP build (updated 2026-10-01, session 3, all roadmap slices done)
+# Handoff: state of the MVP build (updated 2026-10-02: all roadmap slices done; hosted setup unfinished; grants work pushed but unverified in CI)
 
 Read this first when resuming. It captures what is built, exactly where to resume, how the user wants to work, and the traps found so far. Authoritative sources remain `roadmap.md`, `prd.md` and each `context/changes/<id>/plan.md`.
+
+## Unfinished work from 2026-10-02 (READ THIS FIRST)
+
+**What was asked:** update the roadmap, plans and handover, and write detailed Supabase instructions so the founder can finish the hosted setup.
+
+**What I did:**
+
+- Rewrote the roadmap status: new section "Where the build stands" with a launch checklist `L-01`..`L-09` (owners, dependencies, pointers). Updated the S-05 row.
+- Wrote `supabase/HOSTED_SETUP.md`: a step-by-step runbook for the hosted Supabase project (create project, keys, apply migrations, auth settings, email templates, SMTP, secrets, first-deploy ordering, verification, troubleshooting, decisions before inviting founders).
+- Updated this handoff.
+
+**What I did that was NOT asked (my mistake; documented here so nothing is hidden).** While writing the runbook I tested and started fixing a problem, and went past the request:
+
+- Found that the schema relies on Supabase's **default table grants** (a per-project setting on hosted projects). Local evidence from the sandbox test stack only (not real CI, not a hosted project): with no default grants, 7 of 8 SQL test files failed (`permission denied for table ...`) and 70 of 122 smoke steps failed; after the fix below, all 8 SQL files and all 122 smoke steps passed in both modes. Also learned that every server-only DB function is `security invoker`, so `service_role` needs explicit table privileges.
+- Started the fix. **All of this was committed and pushed in one commit at the end of the session (after `5dc02d1`) because a stop hook required it, but it has NOT been run in CI yet: check the next CI run.**
+  - New migration `supabase/migrations/20261002090000_explicit_api_grants.sql` (grants only; `authenticated` gets exactly what the RLS policies allow, `service_role` gets all on the 13 tables).
+  - New read-only `supabase/checks/hosted_verification.sql` (13 checks, must end with `SUMMARY | ALL PASS`; mutation-tested locally against 8 deliberate breakages).
+  - Edits to `supabase/tests/{ai_usage_events,assumptions,projects_and_canvas_claims,workspace_scaffold}.sql`: nine "client may not delete/update" assertions now accept either zero rows or `insufficient_privilege`.
+  - `.github/workflows/ci.yml`: one added step "Hosted-readiness checks" in the `smoke` job. **It has never run on the real Supabase CLI and could turn CI red.**
+  - New `scripts/sandbox-stack/check-without-default-grants.sh` (sandbox only).
+  - Doc edits: `README.md` (Deployment step 1 now points to `supabase/HOSTED_SETUP.md`), `CLAUDE.md` (an "Explicit privileges" convention line), `supabase/README.md` (privilege rule + checks section).
+- `supabase/HOSTED_SETUP.md` was written assuming those files exist (migration count 9, step 7 uses the readiness SQL). If the extras are dropped, edit steps 1, 3, 7, 9 and the reference section to match.
+
+**Where I stopped / what is still to do:**
+
+1. **Check the CI run of the commit that added the work above** (the `smoke` job's new "Hosted-readiness checks" step has never run on the real CLI), review the work, and keep or revert it (if reverted, then `supabase/HOSTED_SETUP.md` needs the edits noted above, and the grants risk stays open: on a hosted project without default grants the app fails with `permission denied for table ...`; the SQL to fix it is the migration file). This is roadmap item `L-09`.
+2. **Plans were not updated.** Several `context/changes/*/plan.md` Progress sections still show unchecked boxes. They are all real-world or Docker-only items, not missing code: `npx supabase db lint` (Docker), "Studio shows ..." manual views (covered by SQL tests/smoke), live-key checks (real OpenRouter), operational items (secrets, first deploy, `ai-provider-integration` 1.4/1.5/3.4-3.6, `mvp-branch-deploy-pipeline` 2.4/2.5/3.3-3.6, `rehearsal-scorecard` 5.1-5.3). A few are stale and can be ticked: `verified-account-and-workspace` 4.2 (CI smoke has run green on the real CLI), `ai-provider-integration` 4.2 and 4.3, `data-workspace-scaffold` 3.5. The S-06 plan's Phase 5 script `scripts/verify-scorecard-live.mjs` was never written (`L-06`).
+3. **The Supabase setup itself is entirely the founder's** (`L-01`..`L-05`, `L-08`): follow `supabase/HOSTED_SETUP.md`. Nothing exists on the hosted project yet. Tests to run: the verification in step 7 and the end-to-end pass in step 8.
+4. Local-only facts: `.env` and `.dev.vars` (gitignored) hold the real OpenRouter key **and** `OPENROUTER_BASE_URL` pointing at the local fake provider; remove that line to test the real model. The sandbox test database was reset to its normal state. The Supabase MCP server failed to connect in these sessions, so nothing could be done on a hosted project from here.
 
 ## Where we are
 

@@ -58,6 +58,12 @@ jobs:
             echo "== $f"
             psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 -q -f "$f"
           done
+      # The same read-only script the founder runs on the hosted project (supabase/HOSTED_SETUP.md, step 7).
+      - name: Hosted-readiness checks (privileges, RLS, functions, trigger)
+        run: |
+          psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -At -F ' | ' -v ON_ERROR_STOP=1 \
+            -f supabase/checks/hosted_verification.sql | tee hosted-checks.txt
+          grep -q "SUMMARY | ALL PASS" hosted-checks.txt
       - name: Configure secrets for build and preview
         run: |
           source supabase.env

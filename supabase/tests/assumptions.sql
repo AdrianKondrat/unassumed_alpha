@@ -148,12 +148,18 @@ begin
   exception when check_violation then null; end;
 
   -- No DELETE for anyone.
-  delete from public.assumptions;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'delete removed % assumptions', n; end if;
-  delete from public.assumption_claims;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'delete removed % links', n; end if;
+  begin
+    delete from public.assumptions;
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'delete removed % assumptions', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
+  begin
+    delete from public.assumption_claims;
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'delete removed % links', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
 
   -- Suggest lease: first wins, fresh refused, stale retaken, released reusable.
   if not public.claim_suggest_lease(pa) then raise exception 'free suggest lease not claimed'; end if;

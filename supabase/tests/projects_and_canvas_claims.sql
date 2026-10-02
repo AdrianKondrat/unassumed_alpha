@@ -91,9 +91,12 @@ begin
   exception when unique_violation then null; end;
 
   -- Claim UPDATE and DELETE arrived with S-03 (see canvas_claims_editing.sql). Projects still have no client DELETE.
-  delete from public.projects;
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'project delete affected % rows', n; end if;
+  begin
+    delete from public.projects;
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'project delete affected % rows', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
 
   -- Draft lease: first claim wins, second is refused while fresh, a stale lease can be retaken, a
   -- released lease can be claimed again.

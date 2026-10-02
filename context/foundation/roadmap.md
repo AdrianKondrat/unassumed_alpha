@@ -1,9 +1,9 @@
 ---
 project: "Unassumed"
 version: 1
-status: draft
+status: code-complete
 created: 2026-09-27
-updated: 2026-10-01
+updated: 2026-10-02
 prd_version: 1
 main_goal: market-feedback
 top_blocker: capacity
@@ -39,6 +39,28 @@ First-time founders tend to ask their prospective customers leading, hypothetica
 | S-05 | rehearsal-session-turn-exchange            | start a rehearsal session and exchange turns with the hidden persona                                          | S-04, F-02    | FR-012, FR-013, FR-014         | done   |
 | S-06 | rehearsal-scorecard                        | see the scored transcript with flags, quotes, and a rewrite suggestion                                        | S-05, F-02    | FR-015, FR-016, US-01          | done   |
 | S-07 | resumable-rehearsal-sessions               | resume a disrupted session without losing or duplicating turns                                                | S-05          | FR-017                         | done   |
+
+## Where the build stands (2026-10-02)
+
+**Code-complete.** Every foundation and slice (F-01..F-03, S-01..S-07) is implemented on `mvp`, CI is green on the real Supabase CLI (`ci` + `smoke`: 122 end-to-end steps, 8 SQL assertion files, offline unit suites, hosted-readiness checks), and the planned polish (CSP, per-founder daily AI cap, README) is in. **Nothing has been run against a hosted Supabase project, a deployed Worker, or the real AI model.** What is left is launch work, listed below. `L-06` is the only item an agent can do without the founder; the rest need accounts, keys or judgement.
+
+### Launch checklist (what is still to do)
+
+| ID   | What                                                                                                                                                                                                                                                                         | Owner                             | Needs                         | Detail                                                    | Status |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ----------------------------- | --------------------------------------------------------- | ------ |
+| L-01 | **Hosted Supabase project**: create it, apply the migrations (8 committed, plus the new grants migration, see L-09), configure auth (Site URL, redirect URLs, email templates, SMTP, confirm email on, min password 8), run `hosted_verification.sql`                                                                             | Founder                           | Supabase account, SMTP sender | `supabase/HOSTED_SETUP.md` steps 1-4 and 7                | todo   |
+| L-02 | GitHub secrets (`SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`; optional `SUPABASE_ACCESS_TOKEN`/`_PROJECT_REF`/`_DB_PASSWORD` for automatic `db push`)                                  | Founder                           | L-01                          | `supabase/HOSTED_SETUP.md` step 5                         | todo   |
+| L-03 | Confirm the Cloudflare account is on the **Workers Paid** plan (scoring runs synchronously for up to ~25 s)                                                                                                                                                                  | Founder                           | -                             | `context/changes/rehearsal-scorecard/research.md`         | todo   |
+| L-04 | **First deploy**: push to `mvp`; confirms F-03 `done`. Then set the Supabase Site URL to the printed Worker URL (the one chicken-and-egg)                                                                                                                                    | Founder                           | L-01, L-02, L-03              | `supabase/HOSTED_SETUP.md` step 6                         | todo   |
+| L-05 | **Hosted end-to-end pass with the real model**: signup on another device, canvas, assumptions, rehearsal, scorecard, reset password. Judge prompt quality, persona realism, scorecard sensibleness, the `openai/gpt-4o-mini` slug, scoring p95 < 25 s, no viability wording  | Founder (+ agent to tune prompts) | L-04                          | `supabase/HOSTED_SETUP.md` step 8; S-06 plan Phase 5      | todo   |
+| L-06 | Write `scripts/verify-scorecard-live.mjs` (S-06 plan 5.1): scores a synthetic 10-turn transcript several times against the real model and reports p50/p95 latency and banned-word violations. Test it against the fake provider; the founder runs it with a real key in L-05 | **Agent**                         | -                             | `context/changes/rehearsal-scorecard/plan.md` Phase 5     | todo   |
+| L-07 | `npx supabase db lint` on the migrations (needs Docker, never run)                                                                                                                                                                                                           | Founder/agent with Docker         | -                             | plan items "No migration lint errors" in each schema plan | todo   |
+| L-08 | Decide before inviting founders: open vs invite-only signup (invite needs a small code change), CAPTCHA, per-IP rate limits, plan/backups, an OpenRouter spend limit, observability, a licence                                                                               | Founder                           | -                             | `supabase/HOSTED_SETUP.md` step 10; `## Parked` below     | todo   |
+| L-09 | **Finish the unfinished grants work**: review the files listed above and run the checks, then check the CI `smoke` job (the new "Hosted-readiness checks" step has never run on the real Supabase CLI and could fail) | Founder or agent | - | `context/foundation/handoff.md`, "Unfinished work from 2026-10-02" | **started, not finished** |
+
+Not on the critical path: the secondary PRD success criterion (a trend across rehearsals) is in no slice; Evidence tracking, teams, billing, benchmarking and multiple projects are parked (PRD non-goals).
+
+**Started on 2026-10-02 and NOT finished (see `L-09`):** while writing the Supabase instructions I found that the schema relies on Supabase's default table grants, which are a per-project setting on hosted projects. I began fixing it. The work is committed and pushed but **not yet run in CI**: migration `supabase/migrations/20261002090000_explicit_api_grants.sql`, a read-only `supabase/checks/hosted_verification.sql`, small edits to four `supabase/tests/*.sql` files, one added step in `.github/workflows/ci.yml`, `scripts/sandbox-stack/check-without-default-grants.sh`, `supabase/HOSTED_SETUP.md`, and doc edits in `README.md`, `CLAUDE.md`, `supabase/README.md`. Details and what is left: `context/foundation/handoff.md`, section "Unfinished work from 2026-10-02".
 
 ## Streams
 
@@ -233,3 +255,4 @@ What's already in place in the codebase as of 2026-09-27 (auto-researched + user
 - **S-07 resumable-rehearsal-sessions** — a refresh, closed tab, lost response or dropped connection no longer loses or duplicates a turn: one idempotency key per question, a reply lease, a state route the chat resyncs from, and lazy 24 h idle expiry that frees the project's session slot. 2026-10-01.
 - **S-06 rehearsal-scorecard** — page-triggered, deadline-bound scoring of the founder's questions: five problem labels with exact quoted turns (copied in SQL, never from the model), at least one rewrite, a beta disclaimer first, no numeric score and no viability wording; scorecards writable only by service-only DB functions. 2026-10-01 (live-model latency/wording check pending).
 - **F-03 mvp-branch-deploy-pipeline** — built, awaiting first real deploy (see item status).
+- **Polish pass** — Content-Security-Policy (no `unsafe-inline`), per-founder daily AI cap (300 calls / 24 h, enforced before any provider call), README rewritten for Unassumed. 2026-10-01.

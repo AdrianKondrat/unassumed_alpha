@@ -114,13 +114,19 @@ end $$;
 do $$
 declare n int;
 begin
-  delete from public.workspaces where id = (select ws_a from _ids);
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'client DELETE on workspaces removed % rows', n; end if;
+  begin
+    delete from public.workspaces where id = (select ws_a from _ids);
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'client DELETE on workspaces removed % rows', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
 
-  delete from public.workspace_members where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
-  get diagnostics n = row_count;
-  if n <> 0 then raise exception 'client DELETE on workspace_members removed % rows', n; end if;
+  begin
+    delete from public.workspace_members where user_id = 'aaaaaaaa-0000-0000-0000-000000000001';
+    get diagnostics n = row_count;
+    if n <> 0 then raise exception 'client DELETE on workspace_members removed % rows', n; end if;
+  exception when insufficient_privilege then null; -- denied outright: as safe as RLS filtering to zero rows
+  end;
 end $$;
 
 -- Impersonate founder B: sees only their own rows, and A's rename is invisible to B.
