@@ -1,35 +1,56 @@
-# Handoff: state of the MVP build (updated 2026-10-02: all roadmap slices done; hosted setup unfinished; grants work pushed but unverified in CI)
+# Handoff: state of the MVP build (updated 2026-10-02 afternoon: hosted migrations applied + verified; launch work remains)
 
-Read this first when resuming. It captures what is built, exactly where to resume, how the user wants to work, and the traps found so far. Authoritative sources remain `roadmap.md`, `prd.md` and each `context/changes/<id>/plan.md`.
+Read this first when resuming. It captures what is built, exactly where to resume, how the user wants to work, and the traps found so far. Authoritative sources remain `roadmap.md`, `prd.md` and each `context/changes/<id>/plan.md`. Full runbook: `supabase/HOSTED_SETUP.md`.
 
-## Unfinished work from 2026-10-02 (READ THIS FIRST)
+## Current status (READ THIS FIRST) — 2026-10-02 afternoon
 
-**What was asked:** update the roadmap, plans and handover, and write detailed Supabase instructions so the founder can finish the hosted setup.
+**Code:** all roadmap slices F-01..F-03 and S-01..S-07 are implemented on `mvp`.
 
-**What I did:**
+**Hosted Supabase project `Unassumed_alpha`** (`gxhxhxioshyenbmwkrqg`, eu-west-1): **schema is live and verified.** Agents can query/migrate this project via the authenticated Supabase MCP (and the linked CLI).
 
-- Rewrote the roadmap status: new section "Where the build stands" with a launch checklist `L-01`..`L-09` (owners, dependencies, pointers). Updated the S-05 row.
-- Wrote `supabase/HOSTED_SETUP.md`: a step-by-step runbook for the hosted Supabase project (create project, keys, apply migrations, auth settings, email templates, SMTP, secrets, first-deploy ordering, verification, troubleshooting, decisions before inviting founders).
-- Updated this handoff.
+| Done on hosted | Detail |
+| --- | --- |
+| All **9** migrations applied | Local ↔ remote timestamps match (`npx supabase migration list`). Includes `20261002090000_explicit_api_grants.sql`. |
+| **13** public tables, RLS on | Confirmed via MCP `list_tables`. |
+| `hosted_verification.sql` | **SUMMARY \| ALL PASS** (run with `npx supabase db query -f supabase/checks/hosted_verification.sql --linked`). |
+| Auth basics for local Astro | Site URL `http://127.0.0.1:4321`; redirect allow-list for `127.0.0.1` / `localhost` `:4321` callback + `/**`; min password **8**; email confirmation **required** (`mailer_autoconfirm: false`). |
+| Local env keys | Gitignored `.env` / `.dev.vars` hold `SUPABASE_URL`, `SUPABASE_KEY` / `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY` / `SUPABASE_SERVICE_ROLE_KEY` (alias), `SUPABASE_JWKS_URL`, `OPENROUTER_API_KEY`. Also `@supabase/server` + skill `supabase-server` installed for agents. |
 
-**What I did that was NOT asked (my mistake; documented here so nothing is hidden).** While writing the runbook I tested and started fixing a problem, and went past the request:
+**Not done yet:** Worker deploy, GitHub/Cloudflare secrets, custom SMTP + custom email templates, live end-to-end with the real model, and a few agent-only follow-ups. See the two tables below.
 
-- Found that the schema relies on Supabase's **default table grants** (a per-project setting on hosted projects). Local evidence from the sandbox test stack only (not real CI, not a hosted project): with no default grants, 7 of 8 SQL test files failed (`permission denied for table ...`) and 70 of 122 smoke steps failed; after the fix below, all 8 SQL files and all 122 smoke steps passed in both modes. Also learned that every server-only DB function is `security invoker`, so `service_role` needs explicit table privileges.
-- Started the fix. **All of this was committed and pushed in one commit at the end of the session (after `5dc02d1`) because a stop hook required it, but it has NOT been run in CI yet: check the next CI run.**
-  - New migration `supabase/migrations/20261002090000_explicit_api_grants.sql` (grants only; `authenticated` gets exactly what the RLS policies allow, `service_role` gets all on the 13 tables).
-  - New read-only `supabase/checks/hosted_verification.sql` (13 checks, must end with `SUMMARY | ALL PASS`; mutation-tested locally against 8 deliberate breakages).
-  - Edits to `supabase/tests/{ai_usage_events,assumptions,projects_and_canvas_claims,workspace_scaffold}.sql`: nine "client may not delete/update" assertions now accept either zero rows or `insufficient_privilege`.
-  - `.github/workflows/ci.yml`: one added step "Hosted-readiness checks" in the `smoke` job. **It has never run on the real Supabase CLI and could turn CI red.**
-  - New `scripts/sandbox-stack/check-without-default-grants.sh` (sandbox only).
-  - Doc edits: `README.md` (Deployment step 1 now points to `supabase/HOSTED_SETUP.md`), `CLAUDE.md` (an "Explicit privileges" convention line), `supabase/README.md` (privilege rule + checks section).
-- `supabase/HOSTED_SETUP.md` was written assuming those files exist (migration count 9, step 7 uses the readiness SQL). If the extras are dropped, edit steps 1, 3, 7, 9 and the reference section to match.
+### Still to finish — who does what
 
-**Where I stopped / what is still to do:**
+#### Founder must do (accounts, money, judgement — agents cannot finish these alone)
 
-1. **Check the CI run of the commit that added the work above** (the `smoke` job's new "Hosted-readiness checks" step has never run on the real CLI), review the work, and keep or revert it (if reverted, then `supabase/HOSTED_SETUP.md` needs the edits noted above, and the grants risk stays open: on a hosted project without default grants the app fails with `permission denied for table ...`; the SQL to fix it is the migration file). This is roadmap item `L-09`.
-2. **Plans were not updated.** Several `context/changes/*/plan.md` Progress sections still show unchecked boxes. They are all real-world or Docker-only items, not missing code: `npx supabase db lint` (Docker), "Studio shows ..." manual views (covered by SQL tests/smoke), live-key checks (real OpenRouter), operational items (secrets, first deploy, `ai-provider-integration` 1.4/1.5/3.4-3.6, `mvp-branch-deploy-pipeline` 2.4/2.5/3.3-3.6, `rehearsal-scorecard` 5.1-5.3). A few are stale and can be ticked: `verified-account-and-workspace` 4.2 (CI smoke has run green on the real CLI), `ai-provider-integration` 4.2 and 4.3, `data-workspace-scaffold` 3.5. The S-06 plan's Phase 5 script `scripts/verify-scorecard-live.mjs` was never written (`L-06`).
-3. **The Supabase setup itself is entirely the founder's** (`L-01`..`L-05`, `L-08`): follow `supabase/HOSTED_SETUP.md`. Nothing exists on the hosted project yet. Tests to run: the verification in step 7 and the end-to-end pass in step 8.
-4. Local-only facts: `.env` and `.dev.vars` (gitignored) hold the real OpenRouter key **and** `OPENROUTER_BASE_URL` pointing at the local fake provider; remove that line to test the real model. The sandbox test database was reset to its normal state. The Supabase MCP server failed to connect in these sessions, so nothing could be done on a hosted project from here.
+| # | What | How / where | Notes |
+| --- | --- | --- | --- |
+| 1 | **Custom SMTP** for Auth emails | Supabase Dashboard → Authentication → Emails → SMTP (Resend / Postmark / SES / …). Verify domain (SPF + DKIM). | Free tier + default mailer **blocks** custom templates until SMTP is set (API returned that error when we tried). Built-in mailer is rate-limited and only reliable for team addresses. |
+| 2 | **Paste email templates** | Same Emails UI → Confirm sign up + Reset password. Paste whole files `supabase/templates/confirmation.html` and `recovery.html`; subjects already match the runbook. | Do this **after** SMTP. Templates use `/auth/callback?token_hash=…` (cross-device). |
+| 3 | **GitHub Actions secrets** | GitHub → repo → Settings → Secrets and variables → Actions. | Required: `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`. Optional for auto `db push` on deploy: `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF` (= `gxhxhxioshyenbmwkrqg`), `SUPABASE_DB_PASSWORD`. Detail: `HOSTED_SETUP.md` step 5. |
+| 4 | **Cloudflare Workers Paid** | Cloudflare account plan. | Needed for scorecard (sync work up to ~25 s). |
+| 5 | **First deploy** | Push (or re-run workflow) on `mvp` once secrets exist. | Deploy job prints Worker URL. Until secrets exist it fails at "Check required secrets" by design. Marks F-03 `done` when a real deploy succeeds. |
+| 6 | **Point Auth at the Worker URL** | After first deploy: Dashboard → Authentication → URL Configuration. Set Site URL to the Worker origin (no trailing slash); add `<origin>/auth/callback` and `<origin>/**` to redirect URLs (keep localhost entries if you still develop locally). | Chicken-and-egg: Site URL needs the Worker URL from step 5. **Do not sign up in the live app before this** or confirmation links point wrong. |
+| 7 | **Live end-to-end with real model** | Sign up on another device, canvas → assumptions → rehearsal → scorecard → password reset. Judge quality; watch for "validated"/"proven". | `HOSTED_SETUP.md` step 8. First time anything hits real OpenRouter outside the fake provider. |
+| 8 | **Pre-invite decisions** | Open vs invite-only signup, CAPTCHA, spend limits, backups/Pro plan, licence. | `HOSTED_SETUP.md` step 10 / roadmap `L-08`. Invite-only needs a small code change first (callback does not accept `invite` link type yet). |
+
+#### Agent can do (no founder account step required, or founder only runs a finished script)
+
+| # | What | How | Roadmap |
+| --- | --- | --- | --- |
+| A | Write `scripts/verify-scorecard-live.mjs` and prove it against the **fake** provider | S-06 plan Phase 5.1; add npm script + CI/offline check as appropriate. Founder later runs it with a real key in live pass. | `L-06` |
+| B | Check CI for the grants / hosted-readiness commit | Confirm `smoke` → "Hosted-readiness checks" is green on the real Supabase CLI. Keep or fix; do not leave `L-09` hanging. | `L-09` |
+| C | Tick stale Progress boxes in plans that CI already proved | e.g. `verified-account-and-workspace` 4.2, `ai-provider-integration` 4.2/4.3, `data-workspace-scaffold` 3.5. Leave real-model / Docker / operational boxes unchecked. | — |
+| D | Further schema / SQL / RLS work on the hosted project | Prefer CLI `npx supabase … --linked` or MCP (`execute_sql` / iterate then `db pull` for migrations). Never invent migration filenames. Re-run `hosted_verification.sql` after grant/RLS changes. | — |
+| E | Prompt / copy tuning after founder reports live quality issues | Edit prompts in `src/lib/services/*`; never log founder content or persona text. | after `L-05` |
+| F | `npx supabase db lint` | Only if Docker is available on the machine. | `L-07` |
+
+**Agent must not:** put secrets in tracked files; open a PR unless asked; change Site URL to production without the founder’s Worker URL; attempt to bypass OpenRouter blocks; apply destructive production data changes without asking.
+
+### Hosted Supabase — earlier session notes (grants work, still relevant)
+
+While writing `HOSTED_SETUP.md` an agent discovered the schema depended on Supabase **default table grants**. Fix (committed/pushed earlier the same day): migration `20261002090000_explicit_api_grants.sql`, `supabase/checks/hosted_verification.sql`, SQL test tweaks, CI "Hosted-readiness checks" step, `scripts/sandbox-stack/check-without-default-grants.sh`, doc edits. **That migration is now applied on the hosted project and verification passed.** Remaining for `L-09`: confirm the CI smoke step on the real CLI is green.
+
+Security advisors on the hosted project (expected): INFO on `rehearsal_scenarios` (RLS on, no policies — deliberate); WARN on `is_*_member` SECURITY DEFINER helpers executable by `authenticated` (intentional for RLS).
 
 ## Where we are
 
@@ -50,12 +71,13 @@ Branch `mvp` (push here only; **never open a PR unless the user asks**). Default
 
 CI status (checked in session 3): S-02, S-04, S-05 (06b4de6 + the CLI-pin commit f46b265): `ci` and `smoke` green **on the real Supabase CLI** (including S-05's real-PostgREST privacy step); `deploy` fails only at "Check required secrets", by design. The `smoke` job once failed with `supabase/setup-cli: rate limit exceeded` (GitHub API, unrelated to code); the CLI version is now pinned (2.117.0). Check the CI run of the latest commit first. Tip: `mcp__github__actions_list` `list_workflow_runs` ignores `per_page` and returns a huge payload; prefer `list_workflow_jobs` with a known run id (run URL in the push result / the previous listing) and `get_job_logs` with `return_content: true`.
 
-## RESUME HERE: the user-only live checks, then a few optional follow-ups
+## RESUME HERE
 
-Every roadmap slice (F-01..F-03, S-01..S-07) and the planned polish (README rewrite, CSP, per-founder daily AI cap) is implemented on `mvp`. What is left needs the user or the real world:
+Every roadmap slice (F-01..F-03, S-01..S-07) and the planned polish (README rewrite, CSP, per-founder daily AI cap) is implemented on `mvp`. **Hosted DB migrations + verification are done** (see "Current status" above).
 
-1. **The user-only actions** below (GitHub secrets, hosted Supabase, Workers Paid plan, and one hands-on pass with the real OpenRouter key). Nothing in this repo has ever been run against the real model: the prompts for canvas draft, assumption suggestion, persona and scoring, the `openai/gpt-4o-mini` slug and latency are all unverified.
-2. Optional follow-ups: observability (parked in the roadmap), rate limiting beyond the daily AI cap (per-IP on auth routes), the secondary PRD success criterion (trend across rehearsals; not in any slice), a licence decision (the repo has no LICENSE file, and the README says so), and `npx supabase db lint` (needs Docker).
+**Next critical path (founder):** SMTP → paste email templates → GitHub/Cloudflare secrets → Workers Paid → first deploy → flip Site URL to Worker → live E2E with real model. **Next agent work without waiting:** `L-06` (`scripts/verify-scorecard-live.mjs`), `L-09` (confirm CI hosted-readiness), stale plan Progress ticks.
+
+Nothing in this repo has ever been run against the real model: prompts, `openai/gpt-4o-mini`, and scoring latency are unverified. Optional later: observability, per-IP auth rate limits, trend-across-rehearsals, licence, `npx supabase db lint` (Docker).
 
 ### What the polish pass shipped
 
@@ -90,7 +112,7 @@ Every roadmap slice (F-01..F-03, S-01..S-07) and the planned polish (README rewr
 - Routes: form `POST /api/rehearsal/sessions`; JSON `POST /api/rehearsal/sessions/[id]/turns|retry|end|score`; helpers in `rehearsal-route.ts` (`prepare`, `json`, `readJsonBody`, `turnResponse`) and `rehearsal-http.ts` (`statusForCode`, `toPublicTurn`, `isJsonContentType`); reads in `rehearsals.ts` and `scorecards.ts`; chat island `src/components/rehearsal/RehearsalChat.tsx` + hook `src/components/hooks/useRehearsalSession.ts`.
 - Persona: scenario generated at start (`converse`, `jsonMode`, 20 s timeout), stored in `rehearsal_scenarios` (client-unreadable), injected only into the system prompt of each reply call. `guardReply` rejects viability wording, endorsement wording and setup leaks.
 - Fake provider: handlers `scenario` and `persona` (marker `SCENARIO-MARKER-9c1e`; extra call flags `historyPairs`, `scenarioInSystem`, `scenarioInChat`; modes `viability` and `leak` also apply to them).
-- Local sandbox state at the time of writing: stack, fake provider (:4010) and preview (:4321) were running and the DB was reset; the gitignored `.env`/`.dev.vars` hold the sandbox keys including `SUPABASE_SERVICE_ROLE_KEY`. If the sandbox restarted: `scripts/sandbox-stack/stack.sh start`, `node scripts/fake-openrouter.mjs &`, rebuild, preview.
+- Env note (2026-10-02): gitignored `.env` / `.dev.vars` now hold **hosted** project keys (publishable + secret, plus `SUPABASE_SERVICE_ROLE_KEY` alias and `SUPABASE_JWKS_URL`). If you still use the local sandbox stack for smoke, regenerate sandbox keys with `scripts/sandbox-stack/stack.sh keys` into a separate env or swap back; do not commit either. For fake AI locally, set `OPENROUTER_BASE_URL=http://127.0.0.1:4010/v1`; remove it to hit the real model.
 
 ## How the user wants to work
 
@@ -138,13 +160,15 @@ Every roadmap slice (F-01..F-03, S-01..S-07) and the planned polish (README rewr
 
 Email links use `token_hash` + custom templates (`supabase/templates/`) instead of PKCE links; min password length is 8; `pending_email` cookie instead of an email query param; CI runs SQL tests and on PRs into `main`; deploy job has a required-secrets check and optional `supabase db push`; `OPENROUTER_BASE_URL` override; roadmap/tech-stack say Workers, not Pages; leases are DB functions; S-04's transition rules are trigger-enforced; CI's smoke job runs the fake provider (`OPENROUTER_API_KEY=ci-fake-key`, `OPENROUTER_BASE_URL=http://127.0.0.1:4010/v1`, `FAKE_AI_URL`).
 
-## Actions only the user can do (remind them; list in the final summary)
+## Actions only the user can do (canonical list: "Still to finish — Founder must do" above)
 
-1. GitHub repo secrets: `CLOUDFLARE_API_TOKEN` (Workers Scripts + Workers KV Storage edit), `CLOUDFLARE_ACCOUNT_ID`, `SUPABASE_URL`, `SUPABASE_KEY`, `OPENROUTER_API_KEY`, and from S-05 on `SUPABASE_SERVICE_ROLE_KEY`; optional `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD` (auto `db push`, which the new migrations need on the hosted project, either automatically or by running them manually).
-2. Hosted Supabase project: site URL + `/auth/callback` redirect, email templates pasted from `supabase/templates/`, real SMTP, min password 8, confirm email on (README "MVP deploy"). The user mentioned "a bit to set up with supabase": this list is that work; the Supabase MCP server failed to connect in this session (proxy tunnel error), so it could not be checked or done from here.
-3. First push to `mvp` with secrets set → confirm F-03 `done`; the deploy job fails fast with "Missing GitHub repository secrets" until then.
-4. Confirm the Cloudflare account is on the **Workers Paid** plan (needed for scoring, S-06).
-5. **One live check with the real OpenRouter key** from a machine that can reach it: the model slug `openai/gpt-4o-mini` in `TASK_CONFIG` is unconfirmed, and **no prompt (canvas draft, assumption suggestion) has ever been run against a real model**. Run through sign up → brief → draft → suggest by hand and judge the quality; prompt wording is the likeliest thing to need tuning. Also `npx supabase db lint` locally (needs Docker).
+Short reminder — do not sign up on the hosted app until SMTP + templates + Site URL match the URL you will open:
+
+1. SMTP + paste `supabase/templates/{confirmation,recovery}.html`.
+2. GitHub secrets (and optional `SUPABASE_*` for auto `db push` — schema is already applied once; optional secrets keep future migrations in sync).
+3. Workers Paid → first deploy on `mvp` → set Site URL / redirects to the Worker origin.
+4. Live E2E with the real OpenRouter key; judge prompt/persona/scorecard quality.
+5. Pre-invite decisions (`L-08`).
 
 ## Known gaps / ideas after the slices
 
