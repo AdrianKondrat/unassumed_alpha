@@ -148,7 +148,7 @@ export async function handleWaitlist(
   // Write the row first. From here on, an email provider outage costs a
   // notification — recoverable with `SELECT ... WHERE notified_at IS NULL` —
   // rather than the signup itself, which is recoverable from nowhere.
-  const stored = await storeSignup(env.DB, record);
+  const stored = await storeSignup(env, record);
 
   // Already on the list. Say yes and send nothing: re-notifying the team is
   // noise, and re-sending the confirmation on demand would turn the form into
@@ -161,7 +161,7 @@ export async function handleWaitlist(
 
   if (notification.ok) {
     if (stored.status === "created") {
-      ctx.waitUntil(markSent(env.DB, stored.id, "notified_at"));
+      ctx.waitUntil(markSent(env, stored.id, "notified_at"));
     }
   } else {
     console.error("resend_notification_failed", {
@@ -188,7 +188,7 @@ export async function handleWaitlist(
     ctx.waitUntil(
       sendConfirmation(env, parsed.email).then((result) => {
         if (result.ok) {
-          if (stored.status === "created") return markSent(env.DB, stored.id, "confirmed_at");
+          if (stored.status === "created") return markSent(env, stored.id, "confirmed_at");
           return undefined;
         }
         console.error("resend_confirmation_failed", {

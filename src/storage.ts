@@ -1,15 +1,14 @@
 /**
- * D1 persistence for waitlist signups.
+ * Supabase persistence for waitlist signups (table `public.beta_signups`, see
+ * supabase/beta_signups.sql).
  *
- * The point of this file is ordering: the row is written *before* Resend is
- * called. An email provider outage then costs a notification, which is
- * recoverable from the table, rather than a signup, which is not recoverable
- * from anywhere.
+ * The row is written *before* Resend is called, so an email outage costs a
+ * notification (recoverable: `notified_at IS NULL`), never the signup itself.
  *
- * Every function here degrades rather than throws. A database problem must
- * never be the reason a founder's address is lost, so a failed write is logged
- * and the caller falls through to sending the email anyway.
+ * Talks to PostgREST with the service-role key, which stays server-side as a
+ * Worker secret. Every function degrades rather than throws.
  */
+import type { Env } from "./env";
 
 export type StoreResult =
   | { status: "created"; id: string }
@@ -24,44 +23,59 @@ export interface SignupRecord {
   receivedAt: string;
 }
 
+type SupabaseEnv = Pick<Env, "SUPABASE_URL" | "SUPABASE_SERVICE_ROLE_KEY">;
+
+function endpoint(env: SupabaseEnv, query = ""): string {
+  return `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/beta_signups${query}`;
+}
+
+function headers(env: SupabaseEnv, extra: Record<string, string> = {}): Record<string, string> {
+  return {
+    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    "Content-Type": "application/json",
+    ...extra,
+  };
+}
+
 /**
  * Inserts a signup, or reports that the address is already on the list.
- *
- * `ON CONFLICT DO NOTHING` against the unique index does the deduplication in
- * one statement — a prior SELECT would leave a window in which two concurrent
- * submissions of the same address both pass the check.
+ * `ignore-duplicates` against the unique index on `email_normalised` makes the
+ * check atomic: a duplicate returns an empty array.
  */
-export async function storeSignup(
-  db: D1Database | undefined,
-  record: SignupRecord,
-): Promise<StoreResult> {
-  if (!db) return { status: "unavailable" };
-
-  const id = crypto.randomUUID();
+export async function storeSignup(env: SupabaseEnv, record: SignupRecord): Promise<StoreResult> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("supabase_not_configured");
+    return { status: "unavailable" };
+  }
 
   try {
-    const result = await db
-      .prepare(
-        `INSERT INTO waitlist_signups
-           (id, email, email_normalised, source, country, user_agent, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (email_normalised) DO NOTHING`,
-      )
-      .bind(
-        id,
-        record.email,
-        record.email.toLowerCase(),
-        record.source,
-        record.country,
-        record.userAgent,
-        record.receivedAt,
-      )
-      .run();
+    const response = await fetch(endpoint(env, "?on_conflict=email_normalised"), {
+      method: "POST",
+      headers: headers(env, { Prefer: "resolution=ignore-duplicates,return=representation" }),
+      body: JSON.stringify({
+        email: record.email,
+        email_normalised: record.email.toLowerCase(),
+        source: record.source,
+        country: record.country,
+        user_agent: record.userAgent,
+        created_at: record.receivedAt,
+      }),
+    });
 
-    // `changes` is 0 when the conflict clause suppressed the insert.
-    return result.meta.changes > 0 ? { status: "created", id } : { status: "duplicate" };
+    if (!response.ok) {
+      console.error("supabase_store_failed", {
+        status: response.status,
+        body: (await response.text()).slice(0, 300),
+        email: record.email,
+      });
+      return { status: "unavailable" };
+    }
+
+    const rows = (await response.json()) as Array<{ id: string }>;
+    return rows.length > 0 ? { status: "created", id: rows[0]!.id } : { status: "duplicate" };
   } catch (cause) {
-    console.error("d1_store_failed", {
+    console.error("supabase_store_failed", {
       error: cause instanceof Error ? cause.message : String(cause),
       email: record.email,
     });
@@ -69,23 +83,20 @@ export async function storeSignup(
   }
 }
 
-/**
- * Stamps a row once its email has actually gone out. Best effort by design:
- * the signup is already safe, and failing the request now would be worse than
- * a null column. `notified_at IS NULL` is the recovery query after an outage.
- */
+/** Stamps a row once its email has gone out. Best effort by design. */
 export async function markSent(
-  db: D1Database | undefined,
+  env: SupabaseEnv,
   id: string,
   column: "notified_at" | "confirmed_at",
 ): Promise<void> {
-  if (!db) return;
   try {
-    await db
-      .prepare(`UPDATE waitlist_signups SET ${column} = ? WHERE id = ?`)
-      .bind(new Date().toISOString(), id)
-      .run();
+    const response = await fetch(endpoint(env, `?id=eq.${encodeURIComponent(id)}`), {
+      method: "PATCH",
+      headers: headers(env),
+      body: JSON.stringify({ [column]: new Date().toISOString() }),
+    });
+    if (!response.ok) console.error("supabase_mark_failed", { column, id, status: response.status });
   } catch (cause) {
-    console.error("d1_mark_failed", { column, id, error: String(cause) });
+    console.error("supabase_mark_failed", { column, id, error: String(cause) });
   }
 }

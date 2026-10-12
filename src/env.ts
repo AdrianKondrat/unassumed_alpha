@@ -15,12 +15,11 @@ export interface Env {
   /** Static assets in `public/`. Used to serve our own 404 page. */
   ASSETS: Fetcher;
 
-  /**
-   * Waitlist storage. Optional so the endpoint still works on a deployment
-   * where the binding has not been created — it degrades to email-only rather
-   * than refusing signups.
-   */
-  DB?: D1Database;
+  /** Supabase project URL (plain var). */
+  SUPABASE_URL: string;
+
+  /** Secret. `wrangler secret put SUPABASE_SERVICE_ROLE_KEY`. Server-only. */
+  SUPABASE_SERVICE_ROLE_KEY: string;
 
   /** Secret. `wrangler secret put RESEND_API_KEY`. */
   RESEND_API_KEY: string;

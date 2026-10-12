@@ -26,7 +26,7 @@ as it ships.
    Create the key at resend.com/api-keys with **Sending access** only.
 4. **Apply the database schema:**
    ```bash
-   npx wrangler d1 migrations apply unassumed-alpha --remote
+   supabase db query --linked -f supabase/beta_signups.sql   # creates public.beta_signups
    ```
 5. **Fill in the privacy notice.** `public/privacy.html` has bracketed
    placeholders for your registered company name, address and the transfer

@@ -39,20 +39,6 @@
     "not_found_handling": "none"
   },
 
-  // Waitlist storage. The signup row is written before Resend is called, so an
-  // email outage costs a notification, not a signup. Apply the schema with:
-  //   npx wrangler d1 migrations apply unassumed-alpha --remote
-  "d1_databases": [
-    {
-      "binding": "DB",
-      // Label only — `database_id` is what actually binds. Correct this if the
-      // database is called something else in your dashboard.
-      "database_name": "unassumed-alpha",
-      "database_id": "7ea31764-1dc7-4108-bec9-e7a13b495d3d",
-      "migrations_dir": "migrations"
-    }
-  ],
-
   // Per-IP throttle in front of the Resend call. `namespace_id` is any integer
   // that is unique within your Cloudflare account.
   "ratelimits": [
@@ -71,6 +57,7 @@
   // never touched by a deploy.
   "vars": {
     "SITE_ORIGIN": "https://unassumed.com",
+    "SUPABASE_URL": "https://gxhxhxioshyenbmwkrqg.supabase.co",
     "BRAND_NAME": "Unassumed",
     "WAITLIST_NOTIFICATION_TO": "office@hailanderstudio.com",
     "WAITLIST_FROM_EMAIL": "UNASSUMED <office@hailanderstudio.com>",
