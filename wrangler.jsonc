@@ -14,7 +14,7 @@
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "unassumed-website",
+  "name": "unassumed-alpha",
   "main": "src/index.ts",
 
   // Pin the runtime's behaviour. Raising this date opts into newer runtime
