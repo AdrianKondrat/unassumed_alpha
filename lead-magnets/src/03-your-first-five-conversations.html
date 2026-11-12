@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>Your First Five Conversations — Unassumed Field Sheet 03</title>
+<meta name="author" content="Unassumed">
+<meta name="description" content="Where to find your first five interviewees without a network, what to send them, and how to run 30 minutes without pitching.">
+<link rel="stylesheet" href="print.css">
+<style>
+.warm{display:grid;grid-template-columns:repeat(5,1fr);border:1.5px solid var(--ink)}
+.warm > div{padding:3mm;border-right:1px solid var(--rule);font-size:8.3pt;display:flex;flex-direction:column;gap:1.2mm}
+.warm > div:last-child{border-right:0}
+.warm b{font-size:9pt}
+.warm .h{font:800 6.6pt/1 var(--mono);letter-spacing:.12em}
+.warm .w5{background:var(--teal-wash)}.warm .w4{background:#e8f1ee}.warm .w3{background:var(--paper-ui)}.warm .w2{background:var(--paper-ui)}.warm .w1{background:#fbe9e7}
+.grad{height:3mm;background:linear-gradient(90deg,var(--teal),var(--teal-wash) 60%,#f3c3bd);border:1.5px solid var(--ink);border-top:0}
+.names td{height:9.4mm;padding:1mm 2mm;border-left:1px solid var(--rule-soft)}
+.names td:first-child{border-left:0;width:8mm;font:700 8pt var(--mono);color:var(--ink-mute)}
+.msg{border:1.5px solid var(--ink);background:var(--paper-ui);padding:4.5mm 5mm}
+.msg + .msg{margin-top:4.5mm}
+.msg .body{font-size:10.2pt;line-height:1.75;margin-top:1.8mm}
+.msg .blank{display:inline-block;border-bottom:1.3px solid var(--ink);min-width:30mm;height:4.2mm;vertical-align:baseline}
+.msg .blank.s{min-width:18mm}.msg .blank.l{min-width:52mm}
+.msg .why{font-size:8pt;color:var(--ink-soft);margin-top:1.8mm;border-top:1px dashed var(--rule);padding-top:1.6mm}
+.dont{display:grid;grid-template-columns:repeat(4,1fr);gap:2.5mm}
+.dont div{border:1.5px solid var(--red-text);padding:2.4mm 3mm;font-size:8.2pt;background:#fdf3f1}
+.dont b{color:var(--red-text);display:block;font-size:8.6pt}
+.run-sheet{border:1.5px solid var(--ink)}
+.slot{display:grid;grid-template-columns:22mm 1fr;border-bottom:1px solid var(--rule)}
+.slot:last-child{border-bottom:0}
+.slot .t{background:var(--ink);color:var(--paper);padding:3mm;font:800 9pt/1.2 var(--mono)}
+.slot .t small{display:block;font-weight:600;font-size:6.6pt;letter-spacing:.1em;color:var(--yellow);margin-top:1mm}
+.slot .c{padding:3.6mm 4.5mm;font-size:10pt}
+.slot .c ul{margin:1mm 0 0;padding-left:4.2mm}
+.slot .c li{margin:1.2mm 0}
+.slot .c q,.recover q{font-style:italic;quotes:none}
+.recover{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1.5px solid var(--ink)}
+.recover > div{padding:3.4mm 4mm;border-bottom:1px solid var(--rule);font-size:9.4pt}
+.recover > div:nth-child(odd){border-right:1px solid var(--rule);background:#fdf3f1}
+.recover > div:nth-child(even){background:var(--teal-wash)}
+.recover > div:nth-last-child(-n+2){border-bottom:0}
+.recover h4{font-size:6.4pt;margin-bottom:.8mm}
+.tracker td{height:15mm;padding:1.5mm 2mm;border-left:1px solid var(--rule-soft);font-size:8pt}
+.tracker td:first-child{border-left:0;width:8mm;font:800 10pt var(--mono)}
+.tracker .yn{font:700 6.6pt/1.8 var(--mono);color:var(--ink-mute)}
+.courage td{height:12mm;border-left:1px solid var(--rule-soft)}
+.courage td:first-child{border-left:0;width:8mm;font:700 8pt var(--mono);color:var(--ink-mute)}
+.bridge{background:var(--ink);color:var(--paper);padding:6mm 8mm;position:relative}
+.bridge h2{color:var(--paper)}
+.bridge .cta{display:inline-block;background:var(--yellow);color:var(--ink);font:800 11pt/1 var(--sans);padding:3mm 4.5mm;margin-top:3.5mm;text-decoration:none}
+.steps3{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm}
+.steps3 div{border-top:2px solid var(--ink);padding-top:2.5mm;font-size:8.8pt}
+.steps3 b{display:block;font:800 7.5pt/1 var(--mono);letter-spacing:.14em;margin-bottom:1.5mm}
+.fear{border:1.5px solid var(--ink);background:var(--paper-ui);box-shadow:2.4mm 2.4mm 0 var(--yellow);padding:5mm 6mm}
+.fear .row{display:grid;grid-template-columns:38mm 1fr;gap:4mm;padding:2.2mm 0;border-bottom:1px dashed var(--rule)}
+.fear .row:last-child{border-bottom:0}
+.fear .row span{font:700 7pt/1.3 var(--mono);letter-spacing:.1em;color:var(--ink-mute);padding-top:.6mm}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 — COVER ═══════════ -->
+<section class="page paper cover">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>Founder field sheet 03 / 04</span></div>
+  <div class="kicker">Your First Five Conversations</div>
+  <h1 class="mt2">The scary part<br>isn’t the questions.<br>It’s the <span class="mark">first message.</span></h1>
+  <p class="lede mt3">Plenty of founders know they should talk to customers and still put it off for weeks, because it means asking strangers for time and hearing “no”. This sheet makes the first five conversations small and specific: who to ask, what to send, how to spend the 30 minutes, and what to write down afterwards.</p>
+  <div class="chips mt3"><span class="tag tag-ink">One week</span><span class="tag">6 pages</span><span class="tag">No network needed</span><span class="tag tag-yellow">No pitch deck allowed</span></div>
+
+  <div class="fear mt4">
+    <h4>Name the fear before it names you</h4>
+    <div class="row mt1"><span>WHAT I’M WORRIED WILL HAPPEN</span><div class="lines l1"></div></div>
+    <div class="row"><span>THE WORST REALISTIC OUTCOME</span><div class="lines l1"></div></div>
+    <div class="row"><span>WHAT I LOSE IF I DON’T ASK</span><div class="lines l1"></div></div>
+    <p class="note mt1" style="text-align:right">a “no” costs you a minute. building the wrong thing costs months.</p>
+  </div>
+
+  <div class="grow"></div>
+  <div class="steps3">
+    <div><b>01 · FIND</b>Ten names, warmest first, no network required. (p.2)</div>
+    <div><b>02 · ASK</b>Three messages that ask for a story, not a favour. (p.3)</div>
+    <div><b>03 · RUN</b>A 30-minute run sheet, plus what to say when it goes sideways. (p.4)</div>
+    <div><b>04 · TRACK</b>Five calls, one page, and a courage log. (p.5)</div>
+  </div>
+  <div class="foot"><span>unassumed.com · Built for evidence, not applause</span><span>Free to print and share. Keep this footer.</span></div>
+</section>
+
+<!-- ═══════════ PAGE 2 — FIND ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>01 · Find ten people</span></div>
+  <h2>Start warm. Cold is the last resort.</h2>
+  <p class="lede mt1" style="font-size:10pt">From first principles: people say yes when they already care about the problem, or when someone they trust asks them to. Founders who share their outreach stories publicly tend to report the same thing: cold messages mostly go unanswered, while warm intros and people already complaining get replies. So work left to right.</p>
+  <div class="warm mt3">
+    <div class="w5"><span class="h" style="color:var(--teal)">WARMEST</span><b>Already complaining</b>People posting about this problem in forums, reviews, groups. Reply helpfully first. Check each community’s rules on self-promotion.</div>
+    <div class="w4"><span class="h">WARM</span><b>One intro away</b>Ask friends, ex-colleagues, classmates: “Who do you know who has dealt with ___ recently?”</div>
+    <div class="w3"><span class="h">MILD</span><b>Where they gather</b>Meetups, associations, Slack and Discord groups, courses where your segment already spends time.</div>
+    <div class="w2"><span class="h">COOL</span><b>Your own past</b>People from old jobs, clients, suppliers who fit the segment, even loosely.</div>
+    <div class="w1"><span class="h" style="color:var(--red-text)">COLD</span><b>Strangers</b>Short, specific, no pitch. Expect silence; send more than you need.</div>
+  </div>
+  <div class="grad"></div>
+
+  <h4 class="mt4">My ten: people who had this problem recently</h4>
+  <table class="names mt1">
+    <thead><tr><th></th><th>Name or handle</th><th style="width:40mm">Where I found them</th><th style="width:26mm">Warmth</th><th style="width:30mm">Message sent?</th></tr></thead>
+    <tbody>
+      <tr><td>01</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>02</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>03</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>04</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>05</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>06</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>07</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>08</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>09</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+      <tr><td>10</td><td></td><td></td><td class="mono" style="font-size:6.4pt;color:var(--ink-mute)">W · M · C</td><td></td></tr>
+    </tbody>
+  </table>
+  <div class="grow"></div>
+  <div class="card wash mt3"><p style="font-size:8.8pt"><b>Why five, and why ten names?</b> Five conversations won’t prove anything. They tell you whether you’re talking to the right people and asking the right questions. Research on interview saturation suggests recurring themes start to repeat after roughly a dozen or so interviews in a fairly similar group, and later when the group is mixed. Ten names gets you five calls if half say yes. <span class="small">Guest, Bunce &amp; Johnson (2006), <i>Field Methods</i> 18(1); Hagaman &amp; Wutich (2016), <i>Field Methods</i>.</span></p></div>
+  <div class="foot"><span>Unassumed · Field sheet 03 · Your First Five Conversations</span><span>2 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 3 — ASK ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>02 · Three messages that get a yes</span></div>
+  <h2>Ask for their story, not your validation.</h2>
+  <p class="lede mt1" style="font-size:10pt">People like being asked about their own experience. They don’t enjoy being asked to judge your idea. Fill in the blanks, keep it short, and send it today.</p>
+
+  <div class="msg mt3">
+    <div style="display:flex;justify-content:space-between"><h4>A · The warm-intro ask</h4><span class="tag tag-teal">To a friend</span></div>
+    <p class="body">Hi <span class="blank s"></span>, quick favour. I’m trying to understand how <span class="blank l"></span> deal with <span class="blank l"></span>. Do you know anyone who’s had to deal with that in the last few months? I’d love 20 minutes to hear how they handle it. I’m not selling anything.</p>
+    <p class="why">Why it works: you’re asking for an introduction, not a sale, and “in the last few months” filters for people with fresh, specific memories.</p>
+  </div>
+  <div class="msg">
+    <div style="display:flex;justify-content:space-between"><h4>B · The reply to someone who complained</h4><span class="tag tag-teal">Public post → DM</span></div>
+    <p class="body">Hi <span class="blank s"></span>, I saw your post about <span class="blank l"></span>. That sounds painful. I’m researching how people handle this and I’m not selling anything. Would you be up for a 20-minute chat about what happened and what you tried? Happy to share what I learn from others.</p>
+    <p class="why">Why it works: they’ve already told the world it’s a problem. Lead with their words, and offer something back (a summary of what you learn).</p>
+  </div>
+  <div class="msg">
+    <div style="display:flex;justify-content:space-between"><h4>C · The cold email</h4><span class="tag tag-red">Last resort</span></div>
+    <p class="body"><b>Subject:</b> Quick question about <span class="blank"></span><br>Hi <span class="blank s"></span>, I’m researching how <span class="blank"></span> handle <span class="blank l"></span>, and your work at <span class="blank"></span> suggests you’ve seen it up close. Could I ask you about the last time it came up? 20 minutes, your choice of time, and no pitch. If it’s not a fit, a one-line “no” is genuinely fine.</p>
+    <p class="why">Why it works: it’s specific about why you chose them, it gives them permission to say no, and it promises no pitch. Then keep that promise.</p>
+  </div>
+
+  <div class="grow"></div>
+  <h4 class="mt3">Never in a first message</h4>
+  <div class="dont mt1">
+    <div><b>“Validate”</b>It tells them you want a yes.</div>
+    <div><b>A deck or a link</b>It turns a chat into a review.</div>
+    <div><b>“Would you use…”</b>Save it. Better still, never ask it.</div>
+    <div><b>An hour</b>Ask for 20 minutes and finish on time.</div>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 03 · Your First Five Conversations</span><span>3 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 4 — RUN ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>03 · The 30-minute run sheet</span></div>
+  <h2>Thirty minutes, in four parts.</h2>
+  <p class="small mt1">Print this and keep it beside you on the call. Write in the margins. Change it after every conversation.</p>
+  <div class="run-sheet mt2">
+    <div class="slot"><div class="t">0–3′<small>SET-UP</small></div><div class="c"><b>Lower the stakes.</b> <q>“I’m not selling anything. I’m trying to understand how people deal with ___. There are no wrong answers, and specific stories help me most.”</q></div></div>
+    <div class="slot"><div class="t">3–18′<small>THE LAST TIME</small></div><div class="c"><b>One real event, in detail.</b><ul><li><q>“Tell me about the last time ___ happened.”</q></li><li><q>“What happened just before that? And after?”</q></li><li><q>“What did you try? What did it cost you, in time or money?”</q></li><li><q>“Who else was involved?”</q></li></ul></div></div>
+    <div class="slot"><div class="t">18–25′<small>THEIR WORLD</small></div><div class="c"><b>Zoom out, still about them.</b><ul><li><q>“What’s the hardest part about ___?”</q></li><li><q>“Have you looked for a better way? What happened?”</q></li><li><q>“How does this rank against everything else on your plate?”</q></li></ul></div></div>
+    <div class="slot"><div class="t">25–30′<small>CLOSE</small></div><div class="c"><b>Ask for one next step.</b><ul><li><q>“Who else should I talk to about this?”</q></li><li><q>“Can I come back to you once I’ve spoken to a few more people?”</q></li></ul></div></div>
+  </div>
+  <p class="small mt1">Openers adapted from Y Combinator’s “How to Talk to Users” and Rob Fitzpatrick’s <i>The Mom Test</i>.</p>
+
+  <h4 class="mt3">When it goes sideways</h4>
+  <div class="recover mt1">
+    <div><h4 style="color:var(--red-text)">They say</h4>“Oh, I’d totally use something like that.”</div>
+    <div><h4 style="color:var(--teal)">You say</h4>“Thanks! What are you using today? What did it cost you last time?”</div>
+    <div><h4 style="color:var(--red-text)">They start designing your product</h4>“You should add a feature that…”</div>
+    <div><h4 style="color:var(--teal)">You say</h4>“Interesting. Has that come up for you? When was the last time?”</div>
+    <div><h4 style="color:var(--red-text)">You catch yourself pitching</h4>You’ve been talking for two minutes straight.</div>
+    <div><h4 style="color:var(--teal)">You do</h4>Stop mid-sentence. <q>“Sorry, I’m talking too much. Tell me about the last time…”</q></div>
+    <div><h4 style="color:var(--red-text)">They go vague</h4>“Usually I just sort of deal with it.”</div>
+    <div><h4 style="color:var(--teal)">You say</h4>“Could you walk me through the most recent time, step by step?”</div>
+  </div>
+  <div class="grow"></div>
+  <div class="foot"><span>Unassumed · Field sheet 03 · Your First Five Conversations</span><span>4 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 5 — TRACK ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>04 · Track five calls</span></div>
+  <h2>Five calls, one page.</h2>
+  <p class="lede mt1" style="font-size:10pt">After each call, fill in one row before you do anything else. For the full debrief, use field sheet 04, “The Compliment Trap”.</p>
+  <table class="tracker mt3">
+    <thead><tr><th></th><th style="width:34mm">Who (role)</th><th style="width:20mm">Date</th><th>The best fact I heard (something that happened)</th><th style="width:34mm">Next step they agreed to</th></tr></thead>
+    <tbody>
+      <tr><td>1</td><td></td><td></td><td></td><td class="yn">○ NONE</td></tr>
+      <tr><td>2</td><td></td><td></td><td></td><td class="yn">○ NONE</td></tr>
+      <tr><td>3</td><td></td><td></td><td></td><td class="yn">○ NONE</td></tr>
+      <tr><td>4</td><td></td><td></td><td></td><td class="yn">○ NONE</td></tr>
+      <tr><td>5</td><td></td><td></td><td></td><td class="yn">○ NONE</td></tr>
+    </tbody>
+  </table>
+
+  <h4 class="mt4">Courage log: what I feared vs. what actually happened</h4>
+  <table class="courage mt1">
+    <thead><tr><th></th><th>Before the call I was worried that…</th><th>What actually happened</th></tr></thead>
+    <tbody><tr><td>1</td><td></td><td></td></tr><tr><td>2</td><td></td><td></td></tr><tr><td>3</td><td></td><td></td></tr><tr><td>4</td><td></td><td></td></tr><tr><td>5</td><td></td><td></td></tr></tbody>
+  </table>
+  <div class="grow"></div>
+  <div class="card mt3" style="display:grid;grid-template-columns:1fr auto;gap:6mm;align-items:center">
+    <div><h4>After five calls, ask yourself</h4><p class="small mt1">Did the same problem come up unprompted more than once? Was I talking to the right kind of person? Which of my questions got stories, and which got opinions?</p></div>
+    <p class="hand" style="color:var(--teal);font-size:11pt;text-align:right">then book<br>the next five.</p>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 03 · Your First Five Conversations</span><span>5 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 6 — BRIDGE ═══════════ -->
+<section class="page dark">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>Before you hit send</span></div>
+  <div class="grow"></div>
+  <div class="kicker">Interview #1 is the one you can’t redo</div>
+  <h1 class="mt2" style="color:var(--paper)">Rehearse it<br>first.</h1>
+  <p class="lede mt4" style="max-width:150mm">You get one first conversation with each person. Unassumed gives you as many practice runs as you need before it: a synthetic customer who objects, digresses, goes vague and won’t be led, and then a review of <b style="color:var(--yellow)">your questions</b>, not your idea.</p>
+  <div class="grid3 mt4" style="color:var(--paper)">
+    <div style="border-top:2px solid var(--yellow);padding-top:2.5mm"><h4 style="color:var(--yellow)">Scribble</h4><p class="small mt1" style="color:rgba(245,240,230,.75)">A note or napkin photo becomes a first-pass canvas.</p></div>
+    <div style="border-top:2px solid var(--yellow);padding-top:2.5mm"><h4 style="color:var(--yellow)">Rehearse</h4><p class="small mt1" style="color:rgba(245,240,230,.75)">Practise the pushback before a real person sees you sweat.</p></div>
+    <div style="border-top:2px solid var(--yellow);padding-top:2.5mm"><h4 style="color:var(--yellow)">Evidence</h4><p class="small mt1" style="color:rgba(245,240,230,.75)">Log what real people said, and watch which beliefs survive.</p></div>
+  </div>
+  <p class="mt4" style="font:700 8pt/1.5 var(--mono);letter-spacing:.12em;color:rgba(245,240,230,.7)">AI IS REHEARSAL. CUSTOMERS ARE EVIDENCE.</p>
+  <a href="https://unassumed.com/" style="display:inline-block;align-self:flex-start;background:var(--yellow);color:var(--ink);font:800 13pt/1 var(--sans);padding:4mm 5.5mm;margin-top:4mm;text-decoration:none">Join the first cohort → unassumed.com</a>
+  <p class="mono mt2" style="font-size:7.5pt;letter-spacing:.12em;color:rgba(245,240,230,.6)">PRIVATE BETA · ONE EMAIL WHEN YOUR SEAT OPENS · NO DRIP SEQUENCE</p>
+  <div class="grow"></div>
+  <div class="foot"><span>Unassumed · Field sheet 03 · Free to print and share. Keep this footer.</span><span>6 / 6</span></div>
+</section>
+</body>
+</html>

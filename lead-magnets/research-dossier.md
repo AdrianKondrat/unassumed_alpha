@@ -591,3 +591,8 @@ What remains unverified, and how to close it:
 - **ICO consent wording for the delivery email.** Read the ICO's guidance on consent and on the PECR soft opt-in.
 - **The original Guest et al. text.**
 None of these blocks building the PDFs. All of them affect how hard you push distribution.
+
+---
+
+## Build record
+Built per the revised briefing: 4 field sheets (21 pages) + combined kit in `lead-magnets/pdf/`. The audit corrections listed in Stage 4 §6 were applied in the copy, and each is listed in `lead-magnets/README.md` under "Content rules followed".
