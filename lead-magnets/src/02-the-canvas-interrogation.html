@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>The Canvas Interrogation — Unassumed Field Sheet 02</title>
+<meta name="author" content="Unassumed">
+<meta name="description" content="Turn your business model canvas into named assumptions, a kill list and a one-week experiment map. With five honest AI prompts.">
+<link rel="stylesheet" href="print.css">
+<style>
+.blocks td{padding:3mm 2mm;font-size:8.8pt}
+.blocks td.b{width:33mm;font-weight:800;font-size:9pt}
+.blocks td.b small{display:block;font:700 6.4pt/1.3 var(--mono);letter-spacing:.1em;color:var(--ink-mute);margin-top:.8mm}
+.blocks td.q{width:52mm;color:var(--ink-soft)}
+.blocks td.w{border-left:1px solid var(--rule-soft);background:var(--paper-ui)}
+.blocks tr.grp td{padding:1.4mm 2mm;background:var(--ink);color:var(--paper);font:700 6.8pt/1 var(--mono);letter-spacing:.14em;border:0}
+.map{display:grid;grid-template-columns:9mm 1fr 1fr;grid-template-rows:1fr 1fr 9mm;height:112mm}
+.map .q{border:1.5px solid var(--ink);padding:3mm;position:relative}
+.map .q h4{font-size:7pt}
+.map .q p{font-size:8pt;color:var(--ink-soft);margin-top:1mm;max-width:62mm}
+.map .q.kill{background:var(--yellow)}
+.map .q.tl{border-right:0;border-bottom:0}.map .q.tr{border-bottom:0}.map .q.bl{border-right:0}
+.map .ax{font:700 7pt/1.2 var(--mono);letter-spacing:.12em;display:flex;align-items:center;justify-content:space-between}
+.map .ay{writing-mode:vertical-rl;transform:rotate(180deg);font:700 7pt/1 var(--mono);letter-spacing:.12em;display:flex;justify-content:space-between;align-items:center}
+.ladder{display:grid;grid-template-columns:repeat(5,1fr);gap:0;border:1.5px solid var(--ink)}
+.ladder div{padding:2.8mm 3mm;border-right:1px solid var(--rule);font-size:8.2pt}
+.ladder div:last-child{border-right:0}
+.ladder b{display:block;font-size:8.8pt;margin-top:1.4mm}
+.ladder .z{background:#fbe9e7}.ladder .s1{background:var(--paper-ui)}.ladder .s2{background:var(--teal-wash)}.ladder .s3{background:#bfdcd6}
+.exp{border:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;background:var(--paper-ui)}
+.exp > div{padding:2.4mm 3.5mm;border-bottom:1px solid var(--rule);border-right:1px solid var(--rule)}
+.exp > div:nth-child(2n){border-right:0}
+.exp > div.full{grid-column:1/-1;border-right:0;background:var(--paper-alt)}
+.exp > div:nth-last-child(-n+2){border-bottom:0}
+.exp h4{font-size:6.6pt}
+.exp .lines{min-height:7.6mm}
+.exp .wrong{background:#fbe9e7}
+.menu{display:grid;grid-template-columns:repeat(5,1fr);gap:2.5mm}
+.menu div{border-top:2px solid var(--ink);padding-top:1.6mm;font-size:7.9pt}
+.menu b{display:block;font-size:8.6pt}
+.prompt{border:1.5px solid var(--ink);background:var(--paper-ui);display:grid;grid-template-columns:11mm 1fr}
+.prompt + .prompt{border-top:0}
+.prompt .n{background:var(--ink);color:var(--yellow);font:800 12pt/1 var(--mono);display:flex;align-items:flex-start;justify-content:center;padding-top:3mm}
+.prompt .t{padding:3.6mm 4.5mm}
+.prompt .use{font:700 6.8pt/1.2 var(--mono);letter-spacing:.12em;color:var(--teal);text-transform:uppercase}
+.prompt pre{font:500 8.8pt/1.5 var(--mono);white-space:pre-wrap;margin:1.4mm 0 0;color:var(--ink)}
+.prompt .why{font-size:8pt;color:var(--ink-soft);margin-top:1.2mm}
+.bridge{background:var(--ink);color:var(--paper);padding:7mm 8mm;position:relative}
+.bridge h2{color:var(--paper)}
+.bridge .cta{display:inline-block;background:var(--yellow);color:var(--ink);font:800 11pt/1 var(--sans);padding:3mm 4.5mm;margin-top:4mm;text-decoration:none}
+.steps3{display:grid;grid-template-columns:repeat(4,1fr);gap:4mm}
+.steps3 div{border-top:2px solid var(--ink);padding-top:2.5mm;font-size:8.8pt}
+.steps3 b{display:block;font:800 7.5pt/1 var(--mono);letter-spacing:.14em;margin-bottom:1.5mm}
+.canvas-mini{display:grid;grid-template-columns:repeat(5,1fr);grid-template-rows:20mm 20mm 14mm;border:1.5px solid var(--ink);background:var(--paper-ui);font:700 6pt/1.2 var(--mono);letter-spacing:.06em}
+.canvas-mini div{border:.5px solid var(--rule);padding:1.5mm;position:relative;color:var(--ink-mute)}
+.canvas-mini .hl{background:var(--yellow);color:var(--ink)}
+.canvas-mini .q{position:absolute;right:1.5mm;bottom:1mm;font:600 14pt/1 var(--hand);color:var(--red-text)}
+table td.blank{height:19mm}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 — COVER ═══════════ -->
+<section class="page paper cover">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>Founder field sheet 02 / 04</span></div>
+  <div class="kicker">The Canvas Interrogation</div>
+  <h1 class="mt2">Your canvas is a<br><span class="mark">list of guesses.</span></h1>
+  <p class="lede mt3">A filled-in business model canvas looks like a plan, but every box is a belief nobody has tested yet. This sheet turns the nine boxes into sentences a stranger could prove wrong, finds the three that would sink you, and plans this week’s cheapest test of each.</p>
+  <div class="chips mt3"><span class="tag tag-ink">30 minutes</span><span class="tag">6 pages</span><span class="tag">Works with any canvas</span><span class="tag tag-yellow">Includes 5 honest AI prompts</span></div>
+
+  <div class="mt4" style="display:grid;grid-template-columns:1fr 58mm;gap:7mm;align-items:center">
+    <div class="canvas-mini">
+      <div style="grid-column:1;grid-row:1/3">KEY PARTNERS<span class="q">?</span></div>
+      <div style="grid-column:2;grid-row:1">KEY ACTIVITIES<span class="q">?</span></div>
+      <div style="grid-column:2;grid-row:2">KEY RESOURCES<span class="q">?</span></div>
+      <div class="hl" style="grid-column:3;grid-row:1/3">VALUE PROPOSITIONS<span class="q">?</span></div>
+      <div class="hl" style="grid-column:4;grid-row:1">CUSTOMER RELATIONSHIPS<span class="q">?</span></div>
+      <div class="hl" style="grid-column:4;grid-row:2">CHANNELS<span class="q">?</span></div>
+      <div class="hl" style="grid-column:5;grid-row:1/3">CUSTOMER SEGMENTS<span class="q">?</span></div>
+      <div style="grid-column:1/3;grid-row:3">COST STRUCTURE<span class="q">?</span></div>
+      <div class="hl" style="grid-column:3/6;grid-row:3">REVENUE STREAMS<span class="q">?</span></div>
+    </div>
+    <p class="note" style="font-size:11.5pt">nine boxes,<br>nine guesses.<br><span style="color:var(--ink)">The yellow ones decide whether anyone wants it at all. Interrogate those first.</span></p>
+  </div>
+  <p class="small mt1" style="text-align:right">Layout after the Business Model Canvas by Strategyzer AG (CC BY-SA). The official blank canvas is free at strategyzer.com.</p>
+
+  <div class="grow"></div>
+  <div class="steps3">
+    <div><b>01 · INTERROGATE</b>Rewrite each box as a guess someone could disprove. (p.2)</div>
+    <div><b>02 · RANK</b>Plot the guesses by importance and evidence. Find your kill list. (p.3)</div>
+    <div><b>03 · TEST</b>Map one cheap test for each of your top three. (p.4)</div>
+    <div><b>04 · USE AI HONESTLY</b>Five prompts that find guesses instead of flattering them. (p.5)</div>
+  </div>
+  <div class="foot"><span>unassumed.com · Built for evidence, not applause</span><span>Free to print and share. Keep this footer.</span></div>
+</section>
+
+<!-- ═══════════ PAGE 2 — INTERROGATE THE 9 BLOCKS ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>01 · Interrogate every box</span></div>
+  <h2>Ask each box one hard question.</h2>
+  <p class="lede mt1" style="font-size:10pt">Write your guess as a sentence a stranger could prove wrong: <span class="mono" style="font-size:8.6pt;background:var(--yellow);padding:0 1mm">We believe [who] [does / has / will pay for what], because [what we’ve actually seen].</span> If the “because” is empty, that tells you something too.</p>
+  <table class="blocks mt2">
+    <thead><tr><th>Box</th><th>The question to ask it</th><th>Our guess, as a sentence someone could disprove</th></tr></thead>
+    <tbody>
+      <tr class="grp"><td colspan="3">WILL ANYONE WANT IT? · START HERE</td></tr>
+      <tr><td class="b">Customer segments<small>WHO</small></td><td class="q">Can I name three real people who had this problem in the last month?</td><td class="w"></td></tr>
+      <tr><td class="b">Value proposition<small>WHY THEM</small></td><td class="q">What do they do about it today, and what does that cost them?</td><td class="w"></td></tr>
+      <tr><td class="b">Channels<small>HOW THEY FIND US</small></td><td class="q">Where did the last person with this problem go looking for help?</td><td class="w"></td></tr>
+      <tr><td class="b">Customer relationships<small>HOW WE KEEP THEM</small></td><td class="q">Is this a one-off problem or a recurring one? How do I know?</td><td class="w"></td></tr>
+      <tr><td class="b">Revenue streams<small>WHO PAYS, HOW</small></td><td class="q">What have they already paid to solve it, and who signed off?</td><td class="w"></td></tr>
+      <tr class="grp"><td colspan="3">CAN WE DELIVER IT? · THEN THESE</td></tr>
+      <tr><td class="b">Key activities<small>WHAT WE MUST DO WELL</small></td><td class="q">What’s the one thing that, done badly, makes the rest pointless?</td><td class="w"></td></tr>
+      <tr><td class="b">Key resources<small>WHAT WE NEED</small></td><td class="q">What do we need that we don’t yet have, and how sure are we we can get it?</td><td class="w"></td></tr>
+      <tr><td class="b">Key partners<small>WHO WE DEPEND ON</small></td><td class="q">Who would have to say yes, and have we asked them?</td><td class="w"></td></tr>
+      <tr class="grp"><td colspan="3">CAN IT PAY? · THEN THIS</td></tr>
+      <tr><td class="b">Cost structure<small>WHAT IT COSTS</small></td><td class="q">What does it cost us to win and serve one customer? Is that a guess?</td><td class="w"></td></tr>
+    </tbody>
+  </table>
+  <div class="grow"></div>
+  <div class="card fill mt2" style="display:grid;grid-template-columns:1fr auto;gap:6mm;align-items:center">
+    <p style="font-size:8.8pt"><b>Why this order?</b> If nobody wants it, nothing else on the canvas matters, so test desirability (“will anyone want it?”) before feasibility and viability. Number each guess 1–9 for the next page.</p>
+    <span class="tag tag-open">Order is a rule of thumb</span>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 02 · The Canvas Interrogation</span><span>2 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 3 — ASSUMPTION MAP + EVIDENCE LADDER ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>02 · Rank: find your kill list</span></div>
+  <h2>Plot your nine guesses.</h2>
+  <p class="lede mt1" style="font-size:10pt">Write each guess’s number on the map. <b>Up</b> = how badly the business breaks if it’s wrong. <b>Right</b> = how much real evidence you have. Your kill list is the top-left: important guesses with no evidence behind them.</p>
+  <div class="map mt3">
+    <div class="ay" style="grid-row:1/3"><span>LOW IMPORTANCE</span><span>BREAKS THE BUSINESS ↑</span></div>
+    <div class="q kill tl"><h4>Kill list · test these first</h4><p>Important, and you’re running on belief. Your top three go straight to page 4.</p></div>
+    <div class="q tr"><h4>Keep watching</h4><p>Important, with some evidence. Re-check as you learn more.</p></div>
+    <div class="q bl" style="background:var(--paper-ui)"><h4>Park it</h4><p>Unproven, but it won’t sink you. Leave it alone for now.</p></div>
+    <div class="q" style="background:var(--paper-ui)"><h4>Fine for now</h4><p>Low stakes and supported. Stop thinking about it.</p></div>
+    <div></div>
+    <div class="ax" style="grid-column:2/4"><span>NO EVIDENCE</span><span>STRONG EVIDENCE →</span></div>
+  </div>
+  <p class="small mt1">Prioritising by importance and evidence follows the assumptions-mapping approach in Bland &amp; Osterwalder’s <i>Testing Business Ideas</i>.</p>
+
+  <h4 class="mt3">What counts as evidence? Score honestly before you plot</h4>
+  <div class="ladder mt1">
+    <div class="z"><span class="tag tag-red">None</span><b>A compliment</b>“Love it!” costs them nothing.</div>
+    <div class="z"><span class="tag tag-red">None</span><b>A forecast</b>“I’d use that”, “people would pay”.</div>
+    <div class="s1"><span class="tag">Weak</span><b>A past story</b>A specific time it happened to them.</div>
+    <div class="s2"><span class="tag tag-teal">Good</span><b>A workaround</b>Time or money they already spend on it.</div>
+    <div class="s3"><span class="tag tag-teal">Strong</span><b>A commitment</b>Time, an intro, a deposit, now.</div>
+  </div>
+  <div class="grow"></div>
+  <p class="note mt2">Your own conviction isn’t on the ladder. Neither is your mum’s.</p>
+  <div class="foot"><span>Unassumed · Field sheet 02 · The Canvas Interrogation</span><span>3 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 4 — EXPERIMENT MAP ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>03 · Test: your experiment map</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:6mm">
+    <h2>One cheap test per guess.</h2>
+    <span class="tag tag-open">Fill in before you start</span>
+  </div>
+  <p class="lede mt1" style="font-size:10pt">Decide what “wrong” looks like <b>before</b> you start. Writing the failure condition in advance is the whole trick, because afterwards you’ll want to move the line.</p>
+
+  <div class="mt2" style="display:flex;flex-direction:column;gap:3mm">
+    <div class="exp">
+      <div class="full"><h4>Kill-list guess #1 · We believe…</h4><div class="lines l1"></div></div>
+      <div><h4>Cheapest test (≤ 7 days, no product)</h4><div class="lines"></div></div>
+      <div><h4>What we’ll count</h4><div class="lines"></div></div>
+      <div class="wrong"><h4 style="color:var(--red-text)">We’re wrong if…</h4><div class="lines"></div></div>
+      <div><h4>Result · date</h4><div class="lines"></div></div>
+    </div>
+    <div class="exp">
+      <div class="full"><h4>Kill-list guess #2 · We believe…</h4><div class="lines l1"></div></div>
+      <div><h4>Cheapest test (≤ 7 days, no product)</h4><div class="lines"></div></div>
+      <div><h4>What we’ll count</h4><div class="lines"></div></div>
+      <div class="wrong"><h4 style="color:var(--red-text)">We’re wrong if…</h4><div class="lines"></div></div>
+      <div><h4>Result · date</h4><div class="lines"></div></div>
+    </div>
+    <div class="exp">
+      <div class="full"><h4>Kill-list guess #3 · We believe…</h4><div class="lines l1"></div></div>
+      <div><h4>Cheapest test (≤ 7 days, no product)</h4><div class="lines"></div></div>
+      <div><h4>What we’ll count</h4><div class="lines"></div></div>
+      <div class="wrong"><h4 style="color:var(--red-text)">We’re wrong if…</h4><div class="lines"></div></div>
+      <div><h4>Result · date</h4><div class="lines"></div></div>
+    </div>
+  </div>
+
+  <h4 class="mt3" style="display:flex;justify-content:space-between"><span>A starter menu of cheap tests</span><span style="color:var(--ink-mute)">illustrative · roughly cheapest first</span></h4>
+  <div class="menu mt1">
+    <div><b>Dig for workarounds</b>Search forums and reviews for people already hacking a fix or paying for one.</div>
+    <div><b>Five conversations</b>Past-behaviour interviews with people from your segment. See field sheets 01 &amp; 03.</div>
+    <div><b>Do it by hand</b>Deliver the outcome manually for one or two people before you build anything.</div>
+    <div><b>A one-page offer</b>Describe it plainly with a clear ask, and count who takes the next step.</div>
+    <div><b>Ask for commitment</b>A deposit, letter of intent or intro. The strongest signal, and the scariest ask.</div>
+  </div>
+  <div class="grow"></div>
+  <div class="card wash mt2"><p style="font-size:8.8pt"><b>Does this way of working actually help?</b> In a randomised trial, early-stage founders trained to frame ideas as hypotheses and test them dropped weak ideas sooner and earned more revenue than a control group. A larger replication also found benefits. <span class="small">Camuffo, Cordova, Gambardella &amp; Spina, <i>Management Science</i> (2020); replication in <i>Strategic Management Journal</i> (2024).</span></p></div>
+  <div class="foot"><span>Unassumed · Field sheet 02 · The Canvas Interrogation</span><span>4 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 5 — HONEST AI PROMPTS ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>04 · Use AI honestly</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:6mm">
+    <h2>Five prompts that find guesses<br>instead of flattering them.</h2>
+    <span class="tag tag-open">Illustrative · adapt freely</span>
+  </div>
+  <p class="lede mt1" style="font-size:10pt">Chatbots are useful for spotting what you’re assuming, and bad at telling you whether you’re right. Ask the first kind of question, never the second. Paste your canvas from page 2 where it says <span class="mono" style="font-size:8.6pt">[…]</span>.</p>
+
+  <div class="mt3">
+    <div class="prompt"><div class="n">1</div><div class="t"><p class="use">Surface the guesses</p><pre>Here is my business model canvas: […]. List every assumption hidden in it as a sentence that a stranger could prove false. Do not tell me whether the idea is good.</pre></div></div>
+    <div class="prompt"><div class="n">2</div><div class="t"><p class="use">Make them falsifiable</p><pre>For each assumption, describe what I would actually observe in the world if it were false. Be concrete: who does what, how often.</pre></div></div>
+    <div class="prompt"><div class="n">3</div><div class="t"><p class="use">Argue the other side</p><pre>Act as a sceptical investor who has seen 500 ideas like this fail. Which three assumptions, if wrong, would end this business? Give the strongest case against each.</pre></div></div>
+    <div class="prompt"><div class="n">4</div><div class="t"><p class="use">Design the cheapest test</p><pre>Design the cheapest test of this assumption that I can run in seven days without building a product: […]. State in advance the result that would mean I'm wrong.</pre></div></div>
+    <div class="prompt"><div class="n">5</div><div class="t"><p class="use">Check your questions</p><pre>Here are the questions I plan to ask in customer interviews: […]. Flag any that are leading, hypothetical, or mention my solution, and rewrite them to ask about specific past behaviour.</pre></div></div>
+  </div>
+
+  <div class="grow"></div>
+  <div class="grid2 mt3" style="grid-template-columns:1.25fr 1fr">
+    <div class="card bad">
+      <h4 style="color:var(--red-text)">What a chatbot can’t tell you</h4>
+      <p class="mt1" style="font-size:9pt">Whether anyone will pay. Researchers who compared language-model answers with a real national survey found them similar on average, but analyses of the synthetic answers often reached different conclusions from the human data.</p>
+      <p class="small mt1">Bisbee et al. (2024), “Synthetic Replacements for Human Survey Data? The Perils of Large Language Models”, <i>Political Analysis</i> 32.</p>
+    </div>
+    <div class="card" style="display:flex;flex-direction:column;justify-content:center">
+      <p class="hand" style="font-size:12pt;line-height:1.3">Use AI to find guesses.<br>Use people to test them.<br><span style="color:var(--red-text)">Never ask a chatbot if your idea is good.</span></p>
+    </div>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 02 · The Canvas Interrogation</span><span>5 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 6 — LEDGER + BRIDGE ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>Keep the ledger</span></div>
+  <h2>Your assumption ledger.</h2>
+  <p class="lede mt1" style="font-size:10pt">Update this after every test and every conversation. A guess only changes status when a real person did or said something, and you write down who and when.</p>
+  <table class="mt3">
+    <thead><tr><th style="width:8mm">#</th><th>Assumption</th><th style="width:32mm">Status</th><th style="width:52mm">Evidence: what someone did or said</th><th style="width:20mm">Who · when</th></tr></thead>
+    <tbody>
+      <tr><td class="mono">1</td><td class="blank"></td><td class="mono" style="font-size:6.6pt;line-height:1.7">○ UNTESTED<br>○ SUPPORTED<br>○ CONTRADICTED</td><td></td><td></td></tr>
+      <tr><td class="mono">2</td><td class="blank"></td><td class="mono" style="font-size:6.6pt;line-height:1.7">○ UNTESTED<br>○ SUPPORTED<br>○ CONTRADICTED</td><td></td><td></td></tr>
+      <tr><td class="mono">3</td><td class="blank"></td><td class="mono" style="font-size:6.6pt;line-height:1.7">○ UNTESTED<br>○ SUPPORTED<br>○ CONTRADICTED</td><td></td><td></td></tr>
+      <tr><td class="mono">4</td><td class="blank"></td><td class="mono" style="font-size:6.6pt;line-height:1.7">○ UNTESTED<br>○ SUPPORTED<br>○ CONTRADICTED</td><td></td><td></td></tr>
+      <tr><td class="mono">5</td><td class="blank"></td><td class="mono" style="font-size:6.6pt;line-height:1.7">○ UNTESTED<br>○ SUPPORTED<br>○ CONTRADICTED</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  <p class="note teal mt2">A contradicted assumption isn’t a failure. It’s the cheapest thing you’ll learn all year.</p>
+  <div class="grow"></div>
+  <div class="bridge mt3">
+    <div class="kicker">Paper doesn’t answer back</div>
+    <h2 class="mt1">From scribble to evidence, without the theatre.</h2>
+    <p class="mt2" style="font-size:10pt;max-width:155mm;color:rgba(245,240,230,.86)">Unassumed does this loop with you. A note, voice memo or napkin photo becomes a first-pass canvas you can argue with. Every box becomes an assumption with a status. You rehearse the conversations that could break it against a synthetic customer who won’t be led, then log what real people actually said. No idea score. No “validated” stamp. Just what has happened to each belief, who said it, and when.</p>
+    <a class="cta" href="https://unassumed.com/">Join the first cohort → unassumed.com</a>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 02 · Free to print and share. Keep this footer.</span><span>6 / 6</span></div>
+</section>
+</body>
+</html>

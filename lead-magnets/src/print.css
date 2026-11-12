@@ -90,3 +90,5 @@ td.blank{height:11mm}
 .cover .num{font:800 110pt/0.8 var(--sans);font-stretch:70%;color:var(--yellow);letter-spacing:-.04em}
 .stamp{display:inline-block;border:2px solid currentColor;padding:2mm 3mm;font:800 8pt/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;transform:rotate(-3deg)}
 .chips{display:flex;flex-wrap:wrap;gap:2mm}
+
+.bridge .kicker{color:var(--yellow)}
