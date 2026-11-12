@@ -42,6 +42,8 @@
   --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   --hand:"Shantell Sans","Comic Sans MS",cursive;
   --shell:min(1180px,100% - 48px);
+  /* Hard-offset shadows come in three sizes only. */
+  --shadow-sm:5px 5px 0;--shadow-md:8px 8px 0;--shadow-lg:12px 12px 0;
   /* Section rhythm. Loud sections take --pad-lg, quiet ones --pad-sm. The
      contrast between them is the page's pulse; one repeated value is not. */
   --pad-lg:clamp(84px,9vw,132px);
@@ -60,7 +62,7 @@ img,svg{max-width:100%;height:auto}
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .skip{position:absolute;left:-9999px;top:0;z-index:100;background:var(--ink);color:#fff;padding:14px 20px;font-weight:700}
 .skip:focus{left:12px;top:12px}
-.disp{font-weight:900;letter-spacing:-.038em;line-height:.98;text-wrap:balance}
+.disp{font-weight:900;letter-spacing:-.034em;word-spacing:.09em;line-height:.98;text-wrap:balance}
 .hand{font-family:var(--hand);font-weight:600}
 .eyebrow{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.16em}
 .eyebrow i{width:10px;height:10px;background:var(--red);flex:none}
@@ -98,14 +100,14 @@ img,svg{max-width:100%;height:auto}
 
 /* ── Controls ───────────────────────────────────────────────────────────── */
 .waitlist{margin:0}
-.field{display:flex;max-width:600px;border:2px solid var(--ink);background:var(--paper-ui);box-shadow:5px 5px 0 var(--ink)}
-.field:focus-within{box-shadow:5px 5px 0 var(--yellow)}
+.field{display:flex;max-width:600px;border:2px solid var(--ink);background:var(--paper-ui);box-shadow:var(--shadow-sm) var(--ink)}
+.field:focus-within{box-shadow:var(--shadow-sm) var(--yellow)}
 .field input{flex:1;min-width:0;border:0;background:transparent;padding:17px 18px;font:inherit;font-size:16px;color:var(--ink);outline:none}
 .field input::placeholder{color:rgba(25,25,21,.42)}
 .field button{border:0;background:var(--ink);color:#fff;padding:15px 22px;font:inherit;font-weight:800;font-size:15px;cursor:pointer;white-space:nowrap;min-height:48px}
 .field button:hover{background:var(--teal)}
 .field button[aria-busy="true"]{opacity:.7;cursor:progress}
-.field-dark{border-color:#fff;box-shadow:6px 6px 0 var(--yellow)}
+.field-dark{border-color:#fff;box-shadow:var(--shadow-sm) var(--yellow)}
 .field-dark button{background:var(--yellow);color:var(--ink)}
 .field-dark button:hover{background:#fff}
 .field-err{border-color:var(--red-text)}
@@ -118,10 +120,10 @@ img,svg{max-width:100%;height:auto}
 .errnote{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--red-text);margin-top:12px}
 .errnote:empty{display:none}
 .close .errnote{color:#ffd9d5}
-.done{max-width:600px;padding:20px 22px;border:2px solid var(--teal);background:var(--teal-wash);box-shadow:5px 5px 0 var(--teal)}
+.done{max-width:600px;padding:20px 22px;border:2px solid var(--teal);background:var(--teal-wash);box-shadow:var(--shadow-sm) var(--teal)}
 .done strong{display:block;font-size:19px;font-weight:800}
 .done p{margin-top:8px;font-size:15px;line-height:1.55;color:#26463f}
-.done-dark{background:var(--paper-ui);border-color:var(--yellow);box-shadow:6px 6px 0 var(--yellow);color:var(--ink);text-align:left}
+.done-dark{background:var(--paper-ui);border-color:var(--yellow);box-shadow:var(--shadow-sm) var(--yellow);color:var(--ink);text-align:left}
 
 /* ── Nav ────────────────────────────────────────────────────────────────── */
 .nav{border-bottom:1px solid var(--ink)}
@@ -136,10 +138,11 @@ img,svg{max-width:100%;height:auto}
 /* ── Hero — split ───────────────────────────────────────────────────────── */
 /* Poses the problem and stops. The diagnosis is here; the rewrite is the peak,
    three sections down, and duplicating the payoff here would spend it early. */
-.hero{display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(48px,6vw,88px);align-items:start;padding-block:clamp(52px,6vw,78px) var(--pad-md)}
-.hero h1{font-size:clamp(3.4rem,7.3vw,6.5rem);margin:32px 0 28px}
+.hero{display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(48px,6vw,88px);align-items:center;padding-block:clamp(52px,6vw,78px) var(--pad-md)}
+.hero h1{font-size:clamp(3.2rem,6.6vw,6rem);margin:28px 0 24px}
+.hero .lede{margin-bottom:34px}
 .review{position:relative;padding-top:12px}
-.review-card{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:10px 10px 0 var(--ink)}
+.review-card{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:var(--shadow-md) var(--ink)}
 .review-head{display:flex;align-items:center;gap:10px;padding:14px 20px;border-bottom:2px solid var(--ink);background:var(--paper-alt);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.14em}
 .review-head i{width:9px;height:9px;background:var(--red);flex:none}
 .review-src{margin-left:auto;font-weight:400;letter-spacing:.1em;color:var(--ink-mute)}
@@ -177,7 +180,7 @@ img,svg{max-width:100%;height:auto}
    finished state renders, so a reader without JS still sees a true page. */
 .td{position:relative;height:360vh;background:var(--paper-alt);border-block:1px solid var(--ink)}
 .td-pin{position:sticky;top:0;height:100vh;height:100svh;display:grid;align-items:center;overflow:hidden}
-.td-frame{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:12px 12px 0 var(--ink)}
+.td-frame{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:var(--shadow-lg) var(--ink)}
 .td-head{display:flex;align-items:center;gap:10px;padding:13px 22px;border-bottom:2px solid var(--ink);background:var(--ink);color:var(--paper);font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em}
 .td-head i{width:9px;height:9px;background:var(--red);flex:none;animation:blink 1.6s steps(1,end) infinite}
 @keyframes blink{50%{opacity:.25}}
@@ -263,7 +266,7 @@ img,svg{max-width:100%;height:auto}
 .legend .y i{background:var(--yellow)}
 .legend .r i{background:var(--red)}
 .legend .t i{background:var(--teal)}
-.score{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:10px 10px 0 var(--ink);padding:32px 34px 34px}
+.score{background:var(--paper-ui);border:2px solid var(--ink);box-shadow:var(--shadow-md) var(--ink);padding:32px 34px 34px}
 .score-top{display:flex;align-items:flex-end;padding-bottom:20px;border-bottom:2px solid var(--ink)}
 .score-top div{margin-right:auto}
 .score-title{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.14em}
@@ -298,7 +301,7 @@ img,svg{max-width:100%;height:auto}
 .prov-stack .sim{border:2px dashed rgba(25,25,21,.4);background:transparent;transform:rotate(-.8deg);transform-origin:left top}
 /* The evidence card lands on top of the guess, overlapping it. Two states of
    one belief, not two objects in a list. */
-.prov-stack .real{position:relative;margin-left:clamp(18px,3vw,44px);border:2px solid var(--teal);box-shadow:8px 8px 0 var(--teal)}
+.prov-stack .real{position:relative;margin-left:clamp(18px,3vw,44px);border:2px solid var(--teal);box-shadow:var(--shadow-md) var(--teal)}
 .prov-arrow{position:relative;z-index:2;font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:.15em;color:var(--ink-mute);margin:20px 0 10px}
 .prov-stack header{display:flex;align-items:center;gap:10px}
 .prov-stack time{font-family:var(--mono);font-size:10px;letter-spacing:.1em;margin-left:auto;color:var(--ink-mute)}
@@ -370,7 +373,7 @@ img,svg{max-width:100%;height:auto}
 
 /* ── Standalone pages: /thanks, /privacy, /404, Worker error ────────────── */
 .mini{display:grid;place-items:center;min-height:100vh;min-height:100svh;padding:40px 0}
-.mini-card{width:var(--shell);max-width:640px;background:var(--paper-ui);border:2px solid var(--ink);box-shadow:10px 10px 0 var(--ink);padding:clamp(30px,5vw,48px)}
+.mini-card{width:var(--shell);max-width:640px;background:var(--paper-ui);border:2px solid var(--ink);box-shadow:var(--shadow-md) var(--ink);padding:clamp(30px,5vw,48px)}
 .mini-card .disp{font-size:clamp(2.1rem,5vw,3.2rem);margin:26px 0 20px}
 .mini-card .slabel{display:block}
 .mini-back,.mini-card .mini-cta{display:inline-flex;align-items:center;min-height:44px;margin-top:26px;font-weight:800;font-size:15px;color:var(--ink);text-decoration:none;box-shadow:inset 0 -3px 0 var(--yellow)}
@@ -420,7 +423,7 @@ img,svg{max-width:100%;height:auto}
   .review-score{flex-direction:column;align-items:flex-start;gap:16px}
   .review-verdict{margin-left:0;text-align:left}
   .td{height:260vh}
-  .td-frame{box-shadow:7px 7px 0 var(--ink)}
+  .td-frame{box-shadow:var(--shadow-sm) var(--ink)}
   .td-bad,.td-good{font-size:1.22rem}
   /* A pinned frame on a phone reserves the replacement's space for the whole
      first act, so keep that reservation small or stage 0 is mostly void. */

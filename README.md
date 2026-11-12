@@ -31,8 +31,9 @@ as it ships.
 5. **Fill in the privacy notice.** `public/privacy.html` has bracketed
    placeholders for your registered company name, address and the transfer
    mechanism in your Resend and Cloudflare contracts.
-6. **Decide the bracketed values on the page.** The price, the beta date and the
-   rehearsal count render as deliberate blanks (`[$6.99]`, `Nov 2026`, `[5]`).
+6. **Decide the bracketed values on the page.** The price and the
+   rehearsal count render as deliberate blanks (`[$6.99]`, `[5]`). The nav reads
+   "Private beta · starting soon" so it cannot go stale.
    That is a design device, not an oversight — but confirm you want it live.
 
 ---
