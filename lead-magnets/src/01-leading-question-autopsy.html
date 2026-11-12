@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<title>The Leading Question Autopsy — Unassumed Field Sheet 01</title>
+<meta name="author" content="Unassumed">
+<meta name="description" content="Find the questions in your customer interview script that will get you lied to. A 15-minute self-audit for first-time founders.">
+<link rel="stylesheet" href="print.css">
+<style>
+.tells{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm}
+.tell{border:1.5px solid var(--ink);padding:4mm;background:var(--paper-ui);display:flex;flex-direction:column;gap:2mm}
+.tell .eg{font-size:9pt;border-left:3px solid var(--red-text);padding-left:2.5mm;font-style:italic}
+.tell .test{margin-top:auto;font:700 7.6pt/1.35 var(--mono);letter-spacing:.04em;border-top:1px dashed var(--rule);padding-top:2mm}
+.clean{border:1.5px solid var(--teal);background:var(--teal-wash);padding:4mm 5mm;display:grid;grid-template-columns:38mm 1fr;gap:5mm;align-items:center}
+.ev{border-top:2px solid var(--ink)}
+.ev-row{display:grid;grid-template-columns:1fr 37mm;gap:5mm;padding:2.6mm 0;border-bottom:1px solid var(--rule)}
+.ev-row p{font-size:9pt}
+.ev-row .tag{white-space:normal;line-height:1.25;max-width:100%}
+.ev-row .src{font-size:7.6pt;color:var(--ink-soft);margin-top:.8mm}
+.drill td{font-size:10pt;padding:3.6mm 2mm}
+.drill td.q{width:58%}
+.drill td.n{width:7mm;font:700 8pt var(--mono);color:var(--ink-mute)}
+.drill td.c{text-align:center;width:12%}
+.drill th.c{text-align:center}
+.key td{font-size:9.2pt;padding:2.9mm 2mm}
+.key td.n{width:7mm;font:700 8pt var(--mono);color:var(--ink-mute)}
+.key td.a{width:34mm}
+.audit td{padding:0;height:13.2mm;border-bottom:1px solid var(--rule)}
+.audit td.n{width:7mm;font:700 8pt var(--mono);color:var(--ink-mute);padding:2mm 1mm}
+.audit td.c{width:13mm;border-left:1px solid var(--rule-soft);text-align:center;vertical-align:middle}
+.audit th.c{text-align:center;width:13mm;font-size:6.2pt;letter-spacing:.06em;padding:1.5mm .5mm}
+.tally{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm}
+.tally .card{padding:3.5mm 4mm}
+.big-blank{display:inline-block;min-width:16mm;border-bottom:1.5px solid var(--ink);height:8mm}
+.rw{display:grid;grid-template-columns:1fr 1fr;border:1.5px solid var(--ink)}
+.rw > div{padding:3.5mm 4mm}
+.rw .b{border-right:1.5px solid var(--ink);background:var(--paper-ui)}
+.rw .a{background:var(--teal-wash)}
+.rw + .rw{border-top:0}
+.bridge{background:var(--ink);color:var(--paper);padding:7mm 8mm;position:relative}
+.bridge h2{color:var(--paper)}
+.bridge .cta{display:inline-block;background:var(--yellow);color:var(--ink);font:800 11pt/1 var(--sans);padding:3mm 4.5mm;margin-top:4mm;text-decoration:none}
+.bridge a{color:inherit}
+.cover-sample{border:1.5px solid var(--ink);background:var(--paper-ui);box-shadow:2.4mm 2.4mm 0 var(--yellow);padding:5mm 6mm;transform:rotate(-.6deg)}
+.steps3{display:grid;grid-template-columns:repeat(3,1fr);gap:4mm;counter-reset:s}
+.steps3 div{border-top:2px solid var(--ink);padding-top:2.5mm;font-size:9pt}
+.steps3 b{display:block;font:800 7.5pt/1 var(--mono);letter-spacing:.14em;margin-bottom:1.5mm}
+</style>
+</head>
+<body>
+
+<!-- ═══════════ PAGE 1 — COVER ═══════════ -->
+<section class="page paper cover">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>Founder field sheet 01 / 04</span></div>
+  <div class="kicker">The Leading Question Autopsy</div>
+  <h1 class="mt2">Find the questions<br>in your script that<br>will get you <span class="mark">lied to.</span></h1>
+  <p class="lede mt3">Not maliciously. Politely. Most people will tell a founder what the founder obviously wants to hear. This sheet finds the questions that invite it, and makes you rewrite them before you spend a real conversation on them.</p>
+
+  <div class="chips mt3">
+    <span class="tag tag-ink">15 minutes</span><span class="tag">6 pages</span><span class="tag">Print it · write on it</span><span class="tag tag-yellow">Bring a pen and your script</span>
+  </div>
+
+  <div class="cover-sample mt4">
+    <div style="display:flex;justify-content:space-between;align-items:center"><h4>You wrote</h4><span class="tag tag-open">Illustrative</span></div>
+    <p class="mt1" style="font-size:15pt;font-weight:800;line-height:1.2">“<span class="strike">Would you use an app that automatically organises all your receipts?</span>”</p>
+    <div class="chips mt2"><span class="tag tag-red">Leading</span><span class="tag tag-red">Hypothetical</span><span class="tag tag-red">Solution-biased</span></div>
+    <div class="rule" style="margin:4mm 0 3mm"></div>
+    <h4 style="color:var(--teal)">Ask instead</h4>
+    <p class="mt1" style="font-size:15pt;font-weight:800;line-height:1.2;color:var(--teal)">“Tell me about the last time you had to find a receipt.”</p>
+    <p class="note mt2" style="text-align:right">three problems in one sentence ↑</p>
+  </div>
+
+  <div class="grow"></div>
+  <div class="steps3">
+    <div><b>01 · LEARN</b>The Three Tells: the three ways a question gives the answer away. (p.2)</div>
+    <div><b>02 · DRILL</b>Spot them in 12 illustrative questions, then check the key. (p.3–4)</div>
+    <div><b>03 · AUDIT</b>Run your own script through the test, score it, rewrite the worst. (p.5–6)</div>
+  </div>
+  <div class="foot"><span>unassumed.com · Built for evidence, not applause</span><span>Free to print and share. Keep this footer.</span></div>
+</section>
+
+<!-- ═══════════ PAGE 2 — THE THREE TELLS ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>01 · Learn the Three Tells</span></div>
+  <h2>A question can give its answer away<br>in three ways. We call them the Three Tells.</h2>
+  <p class="lede mt2" style="font-size:10.5pt">Start from first principles. An interview is a measurement. You want to measure what a person <b>has actually done</b>, because that is the closest thing to what they will do. Each Tell swaps that measurement for something cheaper: your opinion, their guess, or their politeness.</p>
+
+  <div class="tells mt3">
+    <div class="tell">
+      <span class="tag tag-red" style="align-self:flex-start">Tell 1 · Leading</span>
+      <h3>The answer you want is inside the question.</h3>
+      <p class="small">It tells them which reply is correct. Most people are kind to a nervous founder, so they pick it.</p>
+      <p class="eg">“Don’t you hate chasing late invoices?”</p>
+      <p class="test">TEST → Could a polite stranger see which answer I’m hoping for?</p>
+    </div>
+    <div class="tell">
+      <span class="tag tag-red" style="align-self:flex-start">Tell 2 · Hypothetical</span>
+      <h3>It asks for a forecast, not a memory.</h3>
+      <p class="small">“Would you”, “how much would you pay”, “do you think people…”. Asking someone to predict their own behaviour gets you an optimistic guess.</p>
+      <p class="eg">“If this existed, how often would you use it?”</p>
+      <p class="test">TEST → Is it about the future, or about other people?</p>
+    </div>
+    <div class="tell">
+      <span class="tag tag-red" style="align-self:flex-start">Tell 3 · Solution-biased</span>
+      <h3>Your idea has walked into the room.</h3>
+      <p class="small">Once they know what you’re building, they review your idea instead of describing their life, and they are polite about it.</p>
+      <p class="eg">“Our tool uses AI to auto-chase clients. Useful?”</p>
+      <p class="test">TEST → Does it mention my product, feature or idea?</p>
+    </div>
+  </div>
+
+  <div class="clean mt3">
+    <div><span class="tag tag-teal">No Tells · Clean</span><p class="hand mt1" style="color:var(--teal);font-size:11pt">ask for a memory, get a story</p></div>
+    <div><p style="font-size:10.5pt"><b>“Tell me about the last time that happened.”</b> &nbsp;A clean question asks about a specific past event. It gets you a date, a workaround, a cost and a person: things that happened, not things they imagine. Then keep going: <i>What did you do next? What did that cost you? What have you tried?</i></p></div>
+  </div>
+
+  <h4 class="mt3" style="display:flex;justify-content:space-between"><span>What the research actually says</span><span style="color:var(--ink-mute)">and how sure to be about it</span></h4>
+  <div class="ev mt1">
+    <div class="ev-row">
+      <div><p><b>People say they’d pay more than they actually do.</b> A meta-analysis comparing stated and real-money valuations found stated amounts were higher, with a median ratio of about 1.35×; other reviews report larger gaps.</p><p class="src">Murphy, Allen, Stevens &amp; Weatherhead (2005), <i>Environmental &amp; Resource Economics</i> 30(3).</p></div>
+      <div><span class="tag tag-teal">Direction: solid</span><br><span class="tag tag-open mt1" style="margin-top:1.5mm">Size: varies a lot</span></div>
+    </div>
+    <div class="ev-row">
+      <div><p><b>Changing what people intend changes what they do much less.</b> Across 47 experiments, shifting intentions produced a noticeably smaller shift in behaviour, and the gap grew with time.</p><p class="src">Webb &amp; Sheeran (2006), <i>Psychological Bulletin</i> 132(2).</p></div>
+      <div><span class="tag tag-teal">Replicated</span><br><span class="tag tag-open" style="margin-top:1.5mm">Health &amp; social behaviour, not purchases</span></div>
+    </div>
+    <div class="ev-row" style="border-bottom:0">
+      <div><p><b>One word can move the answer.</b> People who were asked how fast cars “smashed” into each other gave higher speed estimates than people asked how fast they “contacted”.</p><p class="src">Loftus &amp; Palmer (1974), <i>Journal of Verbal Learning and Verbal Behavior</i> 13(5).</p></div>
+      <div><span class="tag tag-teal">Classic lab study</span><br><span class="tag tag-open" style="margin-top:1.5mm">An analogy for interviews</span></div>
+    </div>
+  </div>
+  <p class="small mt1">Builds on Rob Fitzpatrick’s <i>The Mom Test</i> and Y Combinator’s “How to Talk to Users”. This sheet is the drill, not the book.</p>
+  <div class="foot"><span>Unassumed · Field sheet 01 · The Leading Question Autopsy</span><span>2 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 3 — DRILL ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>02 · Drill</span></div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:8mm">
+    <div>
+      <h2>Spot the Tells.</h2>
+      <p class="lede mt1" style="font-size:10.5pt">Twelve questions a founder of an invoicing tool for freelancers might ask. Tick every Tell you see. A question can have more than one. Tick <b>Clean</b> only if it has none.</p>
+    </div>
+    <span class="tag tag-open">All examples illustrative</span>
+  </div>
+  <table class="drill mt3">
+    <thead><tr><th></th><th>Question</th><th class="c">Leading</th><th class="c">Hypo&shy;thetical</th><th class="c">Solution</th><th class="c" style="color:var(--teal)">Clean</th></tr></thead>
+    <tbody>
+      <tr><td class="n">01</td><td class="q">“Would you use an app that automatically organises your receipts?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">02</td><td class="q">“Tell me about the last time you had to find a receipt.”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">03</td><td class="q">“Don’t you hate chasing late invoices?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">04</td><td class="q">“How much would you pay for something that fixed this?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">05</td><td class="q">“What did you do about it the last time a client paid late?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">06</td><td class="q">“Our tool uses AI to chase clients for you. Does that sound useful?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">07</td><td class="q">“If this existed, how often do you think you’d use it?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">08</td><td class="q">“What’s the hardest part of getting paid for your work?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">09</td><td class="q">“Wouldn’t it be easier if your invoices just sent themselves?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">10</td><td class="q">“Have you tried anything to fix this? What happened?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">11</td><td class="q">“Do you think other freelancers struggle with this too?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">12</td><td class="q">“On a scale of 1 to 10, how painful is invoicing for you?”</td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+    </tbody>
+  </table>
+  <div class="grow"></div>
+  <div class="card fill" style="display:flex;gap:6mm;align-items:center">
+    <p class="hand" style="font-size:12pt;flex:1">Before you turn the page: which one of these have <u>you</u> asked, word for word or close to it?</p>
+    <p class="mono" style="font-size:9pt">No. <span class="big-blank"></span></p>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 01 · The Leading Question Autopsy</span><span>3 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 4 — ANSWER KEY ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>02 · Answer key</span></div>
+  <h2>The key, and why.</h2>
+  <p class="lede mt1" style="font-size:10.5pt">If you disagree with a call, good: argue it out loud. The reasoning matters more than the tick.</p>
+  <table class="key mt3">
+    <thead><tr><th></th><th>Tells</th><th>Why, and a cleaner version</th></tr></thead>
+    <tbody>
+      <tr><td class="n">01</td><td class="a"><span class="tag tag-red">L</span> <span class="tag tag-red">H</span> <span class="tag tag-red">S</span></td><td>Pitches the app, asks for a forecast, and “would you use” has one polite answer. → <i>“Tell me about the last time you had to find a receipt.”</i></td></tr>
+      <tr><td class="n">02</td><td class="a"><span class="tag tag-teal">Clean</span></td><td>A specific past event. Follow with: <i>“What did you do? How long did it take?”</i></td></tr>
+      <tr><td class="n">03</td><td class="a"><span class="tag tag-red">L</span></td><td>“Don’t you hate…” tells them what to feel. → <i>“Walk me through what happens when a client pays late.”</i></td></tr>
+      <tr><td class="n">04</td><td class="a"><span class="tag tag-red">H</span> <span class="tag tag-red">S</span></td><td>Stated prices run higher than real ones (see p.2). → <i>“What have you paid for anything that helps with this? What do you pay now?”</i></td></tr>
+      <tr><td class="n">05</td><td class="a"><span class="tag tag-teal">Clean</span></td><td>Past, specific, no idea mentioned. Dig into the workaround they describe.</td></tr>
+      <tr><td class="n">06</td><td class="a"><span class="tag tag-red">L</span> <span class="tag tag-red">S</span></td><td>A pitch with a question mark at the end. Hold the solution back until you’ve heard the problem in their words.</td></tr>
+      <tr><td class="n">07</td><td class="a"><span class="tag tag-red">H</span> <span class="tag tag-red">S</span></td><td>“If this existed” is both a hypothetical and your product. → <i>“How often did this come up last month?”</i></td></tr>
+      <tr><td class="n">08</td><td class="a"><span class="tag tag-teal">Clean</span></td><td>Open and about their world. It’s one of YC’s suggested openers. Follow up with <i>“When did that last happen?”</i> to get from opinion to a story.</td></tr>
+      <tr><td class="n">09</td><td class="a"><span class="tag tag-red">L</span> <span class="tag tag-red">S</span></td><td>“Wouldn’t it be…” is the leading form, and auto-sending invoices is your feature in disguise.</td></tr>
+      <tr><td class="n">10</td><td class="a"><span class="tag tag-teal">Clean</span></td><td>Gold. What they have already tried, paid for or hacked together is the strongest signal that the problem is real.</td></tr>
+      <tr><td class="n">11</td><td class="a"><span class="tag tag-red">H</span></td><td>Asks them to speculate about other people. → <i>“Who else have you talked to about this? What did they do?”</i></td></tr>
+      <tr><td class="n">12</td><td class="a"><span class="tag tag-red">L</span></td><td>Assumes it is painful and asks for an opinion score. → <i>“How long did invoicing take you last month?”</i></td></tr>
+    </tbody>
+  </table>
+  <div class="grow"></div>
+  <div class="grid2">
+    <div class="card"><h4>Your drill score</h4><p class="mt1" style="font-size:20pt;font-weight:900">&nbsp;<span class="big-blank" style="min-width:14mm"></span> / 12 <span class="small" style="font-weight:400">rows fully right</span></p></div>
+    <div class="card bad"><p class="note" style="font-size:10.5pt">Missed any? Circle them. A Tell you didn’t spot on paper is one you’re likely to ask out loud. Those are your blind spots.</p></div>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 01 · The Leading Question Autopsy</span><span>4 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 5 — AUDIT YOUR SCRIPT ═══════════ -->
+<section class="page">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>03 · Audit your own script</span></div>
+  <h2>Now do it to yourself.</h2>
+  <p class="lede mt1" style="font-size:10.5pt">Write the questions you actually plan to ask in your next interview, word for word. For each one, answer the four checks honestly. Any <b>yes</b> is a Tell.</p>
+  <div class="grid2 mt2" style="grid-template-columns:repeat(4,1fr);gap:3mm;font-size:8.3pt">
+    <div><b class="mono">A · SOLUTION</b><br>Does it mention my idea, product or feature?</div>
+    <div><b class="mono">B · FUTURE</b><br>Is it about the future, a “would”, or other people?</div>
+    <div><b class="mono">C · LEADING</b><br>Is the answer I want hidden inside it?</div>
+    <div><b class="mono">D · COMPLIMENT</b><br>Could they answer “yeah, sounds great” and move on?</div>
+  </div>
+  <table class="audit mt3">
+    <thead><tr><th></th><th>My question, exactly as I’d say it</th><th class="c">A<br>yes?</th><th class="c">B<br>yes?</th><th class="c">C<br>yes?</th><th class="c">D<br>yes?</th><th class="c" style="color:var(--teal)">Clean<br>(all no)</th></tr></thead>
+    <tbody>
+      <tr><td class="n">1</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">2</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">3</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">4</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">5</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">6</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">7</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+      <tr><td class="n">8</td><td></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td><td class="c"><span class="box"></span></td></tr>
+    </tbody>
+  </table>
+  <div class="tally mt3">
+    <div class="card"><h4>Clean questions</h4><p class="mt1" style="font-size:18pt;font-weight:900"><span class="big-blank" style="min-width:12mm"></span> / 8</p></div>
+    <div class="card"><h4>Most common Tell</h4><p class="mt1 mono" style="font-size:10pt">A &nbsp; B &nbsp; C &nbsp; D <span class="small">(circle)</span></p></div>
+    <div class="card"><h4>Fix first</h4><p class="small mt1">Any <b>B</b>. A forecast is the weakest data an interview can collect.</p></div>
+  </div>
+  <div class="grow"></div>
+  <p class="note mt2">Be harsh. Then ask yourself honestly: would a stranger reading these questions have marked them the same way?</p>
+  <div class="foot"><span>Unassumed · Field sheet 01 · The Leading Question Autopsy</span><span>5 / 6</span></div>
+</section>
+
+<!-- ═══════════ PAGE 6 — REWRITE + BRIDGE ═══════════ -->
+<section class="page paper">
+  <div class="run"><span class="logo"><b>UN</b>ASSUMED<i>.</i></span><span>03 · Rewrite your worst three</span></div>
+  <h2>Before → after.</h2>
+  <p class="lede mt1" style="font-size:10.5pt">Take the three questions with the most Tells. Rewrite each one to ask about something that has already happened. <span class="mono" style="font-size:8.5pt">Tip: start with “Tell me about the last time…” or “What did you do when…”</span></p>
+  <div class="mt3">
+    <div class="rw"><div class="b"><h4 style="color:var(--red-text)">Before</h4><div class="lines l2 mt1"></div></div><div class="a"><h4 style="color:var(--teal)">After</h4><div class="lines l2 mt1"></div></div></div>
+    <div class="rw"><div class="b"><h4 style="color:var(--red-text)">Before</h4><div class="lines l2 mt1"></div></div><div class="a"><h4 style="color:var(--teal)">After</h4><div class="lines l2 mt1"></div></div></div>
+    <div class="rw"><div class="b"><h4 style="color:var(--red-text)">Before</h4><div class="lines l2 mt1"></div></div><div class="a"><h4 style="color:var(--teal)">After</h4><div class="lines l2 mt1"></div></div></div>
+  </div>
+
+  <div class="card mt3" style="border-style:dashed">
+    <h4>The part paper can’t do</h4>
+    <p class="mt1" style="font-size:10.5pt">You ask your clean opener. They smile and say: <b>“Oh yeah, I’d totally use something like that.”</b> What do you say next, live, without pitching?</p>
+    <div class="lines l2 mt1"></div>
+  </div>
+
+  <div class="grow"></div>
+  <div class="bridge mt3">
+    <span class="stamp" style="position:absolute;right:8mm;top:-5mm;background:var(--yellow);color:var(--ink);border-color:var(--ink)">Did you mark yourself fairly?</span>
+    <div class="kicker">Paper doesn’t answer back</div>
+    <h2 class="mt1">Rehearse here. Learn out there.</h2>
+    <p class="mt2" style="font-size:10.5pt;max-width:150mm;color:rgba(245,240,230,.86)">Unassumed puts your questions in front of a synthetic customer who objects, digresses and refuses to be led. Then it scores <b>your questions</b>, not your idea. It’s practice, not proof: a cheap place to find your leading questions before you spend a real conversation on them. Only a real customer is evidence.</p>
+    <a class="cta" href="https://unassumed.com/">Join the first cohort → unassumed.com</a>
+    <p class="mono mt2" style="font-size:7.5pt;letter-spacing:.12em;color:rgba(245,240,230,.6)">PRIVATE BETA · ONE EMAIL WHEN YOUR SEAT OPENS · NO DRIP SEQUENCE</p>
+  </div>
+  <div class="foot"><span>Unassumed · Field sheet 01 · Free to print and share. Keep this footer.</span><span>6 / 6</span></div>
+</section>
+</body>
+</html>

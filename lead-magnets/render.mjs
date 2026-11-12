@@ -1,6 +1,7 @@
 // Render every src/*.html to pdf/*.pdf with the preinstalled Chromium.
 // Usage: node lead-magnets/render.mjs [name ...]
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
+const { chromium } = createRequire(import.meta.url)("playwright");
 import { readdirSync } from "node:fs";
 import { join, dirname, basename } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
